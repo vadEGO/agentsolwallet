@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import * as lendService from '../core/lend-service.js';
-import { getDefaultWalletName } from '../core/wallet-manager.js';
+import { getDefaultWalletName, resolveWalletName } from '../core/wallet-manager.js';
 import { output, success, failure, isJsonMode, timed } from '../output/formatter.js';
 import { table } from '../output/table.js';
 import * as walletRepo from '../db/repos/wallet-repo.js';
@@ -56,7 +56,7 @@ export function registerLendCommand(program: Command): void {
     .option('--wallet <name>', 'Wallet to check')
     .action(async (opts) => {
       try {
-        const walletName = opts.wallet || getDefaultWalletName();
+        const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
         const wallet = walletRepo.getWallet(walletName);
         if (!wallet) throw new Error(`Wallet "${walletName}" not found`);
 
@@ -139,7 +139,7 @@ export function registerLendCommand(program: Command): void {
         const amount = parseFloat(amountStr);
         if (isNaN(amount) || amount <= 0) throw new Error('Invalid amount');
 
-        const walletName = opts.wallet || getDefaultWalletName();
+        const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
         const { result, elapsed_ms } = await timed(() =>
           lendService.deposit(walletName, token, amount)
         );
@@ -167,7 +167,7 @@ export function registerLendCommand(program: Command): void {
       try {
         const amount = parseMaxAmount(amountStr);
 
-        const walletName = opts.wallet || getDefaultWalletName();
+        const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
         const { result, elapsed_ms } = await timed(() =>
           lendService.withdraw(walletName, token, amount)
         );
@@ -199,7 +199,7 @@ export function registerLendCommand(program: Command): void {
         if (isNaN(amount) || amount <= 0) throw new Error('Invalid amount');
         if (!opts.collateral) throw new Error('--collateral is required');
 
-        const walletName = opts.wallet || getDefaultWalletName();
+        const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
         const { result, elapsed_ms } = await timed(() =>
           lendService.borrow(walletName, token, amount, opts.collateral)
         );
@@ -233,7 +233,7 @@ export function registerLendCommand(program: Command): void {
       try {
         const amount = parseMaxAmount(amountStr);
 
-        const walletName = opts.wallet || getDefaultWalletName();
+        const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
         const { result, elapsed_ms } = await timed(() =>
           lendService.repay(walletName, token, amount)
         );

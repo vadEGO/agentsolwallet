@@ -3,7 +3,7 @@ import { resolveToken, resolveTokens, syncTokenCache } from '../core/token-regis
 import { getPrices, getPrice } from '../core/price-service.js';
 import { getTokenBalances, getAllTokenAccounts, type TokenAccountInfo } from '../core/token-service.js';
 import { getQuote, executeSwap } from '../core/swap-service.js';
-import { getDefaultWalletName, loadSigner } from '../core/wallet-manager.js';
+import { getDefaultWalletName, resolveWalletName, loadSigner } from '../core/wallet-manager.js';
 import { output, success, failure, isJsonMode, timed, verbose } from '../output/formatter.js';
 import { table } from '../output/table.js';
 import { isValidAddress, solToLamports, uiToTokenAmount, explorerUrl, SOL_MINT } from '../utils/solana.js';
@@ -83,12 +83,12 @@ export function registerTokenCommand(program: Command): void {
 
   token
     .command('list')
-    .description('List all tokens in default wallet')
-    .action(async () => {
+    .description('List all tokens in wallet')
+    .option('--wallet <name>', 'Wallet to use')
+    .action(async (opts: any) => {
       try {
-        const walletName = getDefaultWalletName();
-        const wallet = walletRepo.getWallet(walletName);
-        if (!wallet) throw new Error(`Wallet "${walletName}" not found`);
+        const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
+        const wallet = walletRepo.getWallet(walletName)!;
 
         const { result: balances, elapsed_ms } = await timed(() => getTokenBalances(wallet.address));
 
@@ -174,7 +174,7 @@ export function registerTokenCommand(program: Command): void {
           console.log(`  Route: ${quote.routePlan}`);
         }
 
-        const walletName = opts.wallet || getDefaultWalletName();
+        const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
         const result = await executeSwap(from, to, amount, walletName, { slippageBps: opts.slippage });
 
         if (isJsonMode()) {
@@ -202,7 +202,7 @@ export function registerTokenCommand(program: Command): void {
         if (isNaN(amount) || amount <= 0) throw new Error('Invalid amount');
         if (!isValidAddress(recipient)) throw new Error('Invalid recipient address');
 
-        const walletName = opts.wallet || getDefaultWalletName();
+        const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
         const signer = await loadSigner(walletName);
 
         const tokenMeta = await resolveToken(tokenSymbol);
@@ -264,7 +264,7 @@ export function registerTokenCommand(program: Command): void {
     .action(async (symbol: string, amountStr: string | undefined, opts) => {
       try {
         const { result: data, elapsed_ms } = await timed(async () => {
-          const walletName = opts.wallet || getDefaultWalletName();
+          const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
           const signer = await loadSigner(walletName);
           const wallet = walletRepo.getWallet(walletName);
           if (!wallet) throw new Error(`Wallet "${walletName}" not found`);
@@ -366,7 +366,7 @@ export function registerTokenCommand(program: Command): void {
     .action(async (symbol: string | undefined, opts) => {
       try {
         const { result: data, elapsed_ms } = await timed(async () => {
-          const walletName = opts.wallet || getDefaultWalletName();
+          const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
           const signer = await loadSigner(walletName);
           const wallet = walletRepo.getWallet(walletName);
           if (!wallet) throw new Error(`Wallet "${walletName}" not found`);

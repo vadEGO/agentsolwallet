@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { getDefaultWalletName } from '../core/wallet-manager.js';
+import { getDefaultWalletName, resolveWalletName } from '../core/wallet-manager.js';
 import * as portfolioService from '../core/portfolio-service.js';
 import * as snapshotRepo from '../db/repos/snapshot-repo.js';
 import { renderPortfolio, renderCompare } from '../output/portfolio-renderer.js';
@@ -15,7 +15,7 @@ export function registerPortfolioCommand(program: Command): void {
       const opts = cmd.optsWithGlobals();
       try {
         const { result: report, elapsed_ms } = await timed(() =>
-          portfolioService.getPortfolio(opts.wallet)
+          portfolioService.getPortfolio(opts.wallet ? resolveWalletName(opts.wallet) : undefined)
         );
 
         // Auto-snapshot if stale (fire-and-forget, don't block output)

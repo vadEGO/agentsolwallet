@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, chmodSync, existsSync, mkdirSync, unlinkSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, renameSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { getSolDir } from '../core/config-manager.js';
 
@@ -28,9 +28,9 @@ export function readKeyFile(filePath: string): Uint8Array {
   return new Uint8Array(arr);
 }
 
-export function deleteKeyFile(filePath: string): void {
+export function softDeleteKeyFile(filePath: string): void {
   if (existsSync(filePath)) {
-    unlinkSync(filePath);
+    renameSync(filePath, filePath + '.deleted');
   }
 }
 

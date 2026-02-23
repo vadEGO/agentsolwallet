@@ -1,5 +1,5 @@
 import { type KeyPairSigner, createKeyPairSignerFromBytes } from '@solana/kit';
-import { writeKeyFile, readKeyFile, deleteKeyFile, keyFileExists } from '../utils/fs.js';
+import { writeKeyFile, readKeyFile, softDeleteKeyFile, keyFileExists } from '../utils/fs.js';
 import * as walletRepo from '../db/repos/wallet-repo.js';
 import { getConfigValue } from './config-manager.js';
 import { join } from 'node:path';
@@ -109,6 +109,14 @@ export async function loadSigner(name: string): Promise<KeyPairSigner> {
   return createKeyPairSignerFromBytes(keypairBytes);
 }
 
+export function resolveWalletName(nameOrAddress: string): string {
+  const byName = walletRepo.getWallet(nameOrAddress);
+  if (byName) return byName.name;
+  const byAddress = walletRepo.getWalletByAddress(nameOrAddress);
+  if (byAddress) return byAddress.name;
+  throw new Error(`Wallet "${nameOrAddress}" not found. Run \`sol wallet list\` to see available wallets.`);
+}
+
 export function getDefaultWalletName(): string {
   // Check config for default wallet
   const configured = getConfigValue('defaults.wallet') as string | undefined;
@@ -132,12 +140,11 @@ export function listWallets(label?: string): WalletInfo[] {
   }));
 }
 
-export function removeWallet(name: string, deleteFile: boolean): void {
+export function removeWallet(name: string): void {
   const wallet = walletRepo.getWallet(name);
   if (!wallet) throw new Error(`Wallet "${name}" not found`);
-  if (deleteFile) {
-    deleteKeyFile(wallet.file_path);
-  }
+  // Soft-delete: rename key file so it can be recovered
+  softDeleteKeyFile(wallet.file_path);
   walletRepo.removeWallet(name);
 }
 

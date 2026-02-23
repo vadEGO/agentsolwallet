@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import * as lpService from '../core/lp-service.js';
-import { getDefaultWalletName } from '../core/wallet-manager.js';
+import { getDefaultWalletName, resolveWalletName } from '../core/wallet-manager.js';
 import { output, success, failure, isJsonMode, timed } from '../output/formatter.js';
 import { table } from '../output/table.js';
 import * as walletRepo from '../db/repos/wallet-repo.js';
@@ -49,7 +49,7 @@ export function registerLpCommand(program: Command): void {
     .option('--wallet <name>', 'Wallet to check')
     .action(async (opts) => {
       try {
-        const walletName = opts.wallet || getDefaultWalletName();
+        const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
         const wallet = walletRepo.getWallet(walletName);
         if (!wallet) throw new Error(`Wallet "${walletName}" not found`);
 
@@ -93,7 +93,7 @@ export function registerLpCommand(program: Command): void {
         const amountB = parseFloat(amountBStr);
         if (isNaN(amountA) || isNaN(amountB)) throw new Error('Invalid amounts');
 
-        const walletName = opts.wallet || getDefaultWalletName();
+        const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
         const result = await lpService.deposit(walletName, poolId, amountA, tokenA, amountB, tokenB);
 
         if (isJsonMode()) {
@@ -115,7 +115,7 @@ export function registerLpCommand(program: Command): void {
     .option('--wallet <name>', 'Wallet to use')
     .action(async (poolId: string, opts) => {
       try {
-        const walletName = opts.wallet || getDefaultWalletName();
+        const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
         const result = await lpService.withdraw(walletName, poolId, opts.percent);
 
         if (isJsonMode()) {
@@ -150,7 +150,7 @@ export function registerLpCommand(program: Command): void {
     .option('--wallet <name>', 'Wallet to use')
     .action(async (poolId: string, opts) => {
       try {
-        const walletName = opts.wallet || getDefaultWalletName();
+        const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
         const result = await lpService.claimFees(walletName, poolId);
 
         if (isJsonMode()) {

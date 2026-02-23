@@ -76,13 +76,14 @@ sol wallet import ./keypair.json --name cold  # Import from file
 sol wallet export main                        # Show key file path
 sol wallet remove old-wallet                  # Remove from registry
 
+sol wallet set-default trading                 # Change the active wallet
 sol wallet label main --add trading           # Tag wallets for organization
 sol wallet history                            # Recent transaction activity
 sol wallet history --type swap --limit 5      # Filtered
 sol wallet fund --amount 100                  # Generate fiat onramp URL (Transak)
 ```
 
-Wallets are stored locally as key files. The first wallet created becomes the default for all commands. Override with `--wallet <name>` on any command.
+Wallets are stored locally as key files. The first wallet created becomes the default for all commands. Change it with `sol wallet set-default <name>`, or override per-command with `--wallet <name-or-address>`.
 
 ### token — Prices, swaps, transfers, and account management
 
@@ -97,6 +98,7 @@ sol token swap 50 usdc bonk                   # Swap via Jupiter
 sol token swap 1.5 sol usdc --slippage 100    # 1% slippage tolerance
 sol token swap 50 usdc bonk --quote-only      # Preview without executing
 
+sol token swap 5 usdc sol --wallet backup      # Swap from a specific wallet
 sol token send 2 sol GkX...abc                # Send SOL to an address
 sol token burn bonk --all                     # Burn all of a token
 sol token close --all --yes                   # Close empty accounts, reclaim rent
@@ -314,7 +316,7 @@ src/
 - Private keys are never logged or printed to stdout
 - `wallet export` returns the file path, not the key contents
 - All transactions are logged to SQLite for audit
-- Swap/send commands show details and prompt before executing (unless `--yes`)
+- Swap commands show quote details before executing
 
 ## Disclaimer
 

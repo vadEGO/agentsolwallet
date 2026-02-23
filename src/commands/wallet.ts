@@ -3,6 +3,7 @@ import * as walletManager from '../core/wallet-manager.js';
 import { getSolBalance, getTokenBalances } from '../core/token-service.js';
 import { getPrices } from '../core/price-service.js';
 import { getOnrampUrl } from '../core/onramp-service.js';
+import { setConfigValue } from '../core/config-manager.js';
 import { output, success, failure, isJsonMode, timed, fmtPrice } from '../output/formatter.js';
 import { table } from '../output/table.js';
 import * as walletRepo from '../db/repos/wallet-repo.js';
@@ -67,6 +68,8 @@ export function registerWalletCommand(program: Command): void {
           return;
         }
 
+        const defaultName = walletManager.getDefaultWalletName();
+
         // Fetch SOL balances in parallel
         const balances = await Promise.all(
           wallets.map(w => getSolBalance(w.address).catch(() => null))
@@ -76,11 +79,12 @@ export function registerWalletCommand(program: Command): void {
           output(success(wallets.map((w, i) => ({
             ...w,
             solBalance: balances[i],
+            isDefault: w.name === defaultName,
           }))));
         } else {
           console.log(table(
             wallets.map((w, i) => ({
-              name: w.name,
+              name: w.name === defaultName ? `* ${w.name}` : `  ${w.name}`,
               address: w.address,
               sol: balances[i] !== null ? `${balances[i]!.toFixed(4)} SOL` : '—',
               labels: w.labels.join(', ') || '—',
@@ -101,14 +105,31 @@ export function registerWalletCommand(program: Command): void {
     });
 
   wallet
+    .command('set-default <name>')
+    .description('Set the default wallet for all commands')
+    .action((name: string) => {
+      try {
+        const resolved = walletManager.resolveWalletName(name);
+        setConfigValue('defaults.wallet', resolved);
+        if (isJsonMode()) {
+          output(success({ defaultWallet: resolved }));
+        } else {
+          console.log(`Default wallet set to "${resolved}".`);
+        }
+      } catch (err: any) {
+        output(failure('WALLET_SET_DEFAULT_FAILED', err.message));
+        process.exitCode = 1;
+      }
+    });
+
+  wallet
     .command('balance [name]')
     .description('Show wallet balance (all tokens + USD value)')
     .action(async (name?: string) => {
       try {
         const { result: data, elapsed_ms } = await timed(async () => {
-          const walletName = name || walletManager.getDefaultWalletName();
-          const wallet = walletRepo.getWallet(walletName);
-          if (!wallet) throw new Error(`Wallet "${walletName}" not found`);
+          const walletName = name ? walletManager.resolveWalletName(name) : walletManager.getDefaultWalletName();
+          const wallet = walletRepo.getWallet(walletName)!;
 
           const balances = await getTokenBalances(wallet.address);
 
@@ -207,15 +228,14 @@ export function registerWalletCommand(program: Command): void {
 
   wallet
     .command('remove <name>')
-    .description('Remove a wallet')
-    .option('--delete', 'Also delete the key file')
-    .action((name: string, opts) => {
+    .description('Remove a wallet (key file is kept as .deleted for recovery)')
+    .action((name: string) => {
       try {
-        walletManager.removeWallet(name, opts.delete || false);
+        walletManager.removeWallet(name);
         if (isJsonMode()) {
-          output(success({ name, deleted: opts.delete || false }));
+          output(success({ name }));
         } else {
-          console.log(`Removed wallet "${name}"${opts.delete ? ' (key file deleted)' : ''}`);
+          console.log(`Removed wallet "${name}". Key file renamed to .deleted for recovery.`);
         }
       } catch (err: any) {
         output(failure('WALLET_REMOVE_FAILED', err.message));
@@ -267,9 +287,8 @@ export function registerWalletCommand(program: Command): void {
     .option('--provider <name>', 'Onramp provider (transak, sphere)')
     .action(async (name?: string, opts?: any) => {
       try {
-        const walletName = name || walletManager.getDefaultWalletName();
-        const wallet = walletRepo.getWallet(walletName);
-        if (!wallet) throw new Error(`Wallet "${walletName}" not found`);
+        const walletName = name ? walletManager.resolveWalletName(name) : walletManager.getDefaultWalletName();
+        const wallet = walletRepo.getWallet(walletName)!;
 
         const url = getOnrampUrl({
           walletAddress: wallet.address,
@@ -297,7 +316,7 @@ export function registerWalletCommand(program: Command): void {
     .option('--type <type>', 'Filter by type (transfer, swap)')
     .action(async (name?: string, opts?: any) => {
       try {
-        const walletName = name || walletManager.getDefaultWalletName();
+        const walletName = name ? walletManager.resolveWalletName(name) : walletManager.getDefaultWalletName();
 
         const txs = txRepo.getRecentTransactions({
           walletName,
