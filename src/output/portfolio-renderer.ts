@@ -75,6 +75,54 @@ export function renderPortfolio(report: PortfolioReport): string {
     lines.push('');
   }
 
+  // Lending section
+  const lendPositions = report.positions.filter(p => p.type === 'lend');
+  if (lendPositions.length > 0) {
+    lines.push('Lending (Kamino)');
+    const deposits = lendPositions.filter(p => p.extra?.side === 'deposit');
+    const borrows = lendPositions.filter(p => p.extra?.side === 'borrow');
+    const allLendRows = [
+      ...deposits.map(p => ({
+        type: 'Deposit',
+        token: p.symbol,
+        amount: fmtAmount(p.amount),
+        value: p.valueUsd != null ? `$${fmt(p.valueUsd)}` : '—',
+        apy: p.extra?.apy != null ? `${((p.extra.apy as number) * 100).toFixed(2)}%` : '—',
+      })),
+      ...borrows.map(p => ({
+        type: 'Borrow',
+        token: p.symbol,
+        amount: fmtAmount(p.amount),
+        value: p.valueUsd != null ? `-$${fmt(Math.abs(p.valueUsd))}` : '—',
+        apy: p.extra?.apy != null ? `${((p.extra.apy as number) * 100).toFixed(2)}%` : '—',
+      })),
+    ];
+
+    lines.push(table(allLendRows, [
+      { key: 'type', header: 'Type' },
+      { key: 'token', header: 'Token' },
+      { key: 'amount', header: 'Amount', align: 'right' },
+      { key: 'value', header: 'Value', align: 'right' },
+      { key: 'apy', header: 'APY', align: 'right' },
+    ]));
+
+    const depositTotal = deposits.reduce((s, p) => s + (p.valueUsd ?? 0), 0);
+    const borrowTotal = borrows.reduce((s, p) => s + Math.abs(p.valueUsd ?? 0), 0);
+    if (deposits.length > 0 && borrows.length > 0) {
+      lines.push(`  Net: $${fmt(depositTotal - borrowTotal)}`);
+    }
+
+    // Health factor warning
+    const healthFactors = borrows.map(p => p.extra?.healthFactor as number).filter(h => h != null && h > 0);
+    if (healthFactors.length > 0) {
+      const minHealth = Math.min(...healthFactors);
+      if (minHealth < 1.1) {
+        lines.push(`  Warning: health factor ${minHealth.toFixed(2)} — consider repaying or adding collateral.`);
+      }
+    }
+    lines.push('');
+  }
+
   // Allocation bars
   if (report.allocation.length > 0) {
     lines.push('Allocation');

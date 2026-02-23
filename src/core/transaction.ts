@@ -193,6 +193,13 @@ export async function buildAndSendTransaction(
       const errorClass = classifyError(err);
       verbose(`Transaction attempt ${attempt + 1} failed: ${errorClass} — ${err}`);
 
+      // Extract and log simulation logs from SolanaError context
+      const ctx = (err as any)?.context;
+      if (ctx?.logs?.length) {
+        verbose('Transaction logs:');
+        for (const log of ctx.logs) verbose(`  ${log}`);
+      }
+
       if (lastSignature) {
         updateTransactionStatus(lastSignature, 'failed', String(err));
       }

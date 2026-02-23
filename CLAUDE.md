@@ -103,6 +103,33 @@ const { result, elapsed_ms } = await timed(() => doWork());
 6. Add signpost text after output when there's a natural next action.
 7. Test with both human and `--json` output.
 
+## Portfolio Integration
+
+`sol portfolio` is the unified view of everything the user holds. Every service that manages assets must feed into it.
+
+### How services expose positions
+
+Each service in `src/core/` that holds user assets should export a function that returns positions for a wallet. These get aggregated by `portfolio-service.ts`. The pattern:
+
+```ts
+// In your service (e.g. stake-service.ts, future lend-service.ts):
+// Export a function that returns positions for a wallet address.
+// portfolio-service.ts will call it and normalize the results.
+export async function getStakeAccounts(walletAddress: string): Promise<StakeAccountInfo[]>
+```
+
+`portfolio-service.ts` imports each service, calls its position function, and normalizes everything into `PortfolioPosition[]`. No formal interface/registry needed — just import and call. When adding a new asset type (lending, LP), add a few lines to `getPortfolio()`.
+
+### Transaction log as source of truth
+
+`buildAndSendTransaction()` already logs every tx to `transaction_log` with `type`, `from_mint`, `to_mint`, `from_amount`, `to_amount`. This is the raw data for cost basis and P&L calculations. Don't duplicate this — query the transaction log to compute cost basis (e.g. "you swapped 50 USDC for 0.33 SOL → cost basis of that SOL is $151.50/SOL").
+
+When adding new transaction types, always pass meaningful `txType`, `fromMint`/`toMint`, and amount fields to `buildAndSendTransaction()` so the portfolio can reconstruct history.
+
+### Snapshots
+
+Snapshots capture portfolio state at a point in time. The `snapshot_entries` table has `position_type` ('token', 'stake', 'lend', 'lp') and `protocol` fields. When saving a snapshot, include ALL position types — not just tokens.
+
 ## Testing
 
 Run `npm test` (Node.js native test runner). For manual end-to-end testing against mainnet, use small amounts (0.01 SOL). The public RPC rate-limits aggressively — set a proper RPC via `sol config set rpc.url`.
