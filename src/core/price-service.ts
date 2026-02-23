@@ -20,7 +20,7 @@ async function fetchJupiterPrices(mints: string[]): Promise<Map<string, PriceRes
   await jupiterLimiter.acquire();
 
   const ids = mints.join(',');
-  const url = `https://api.jup.ag/price/v2?ids=${ids}`;
+  const url = `https://lite-api.jup.ag/price/v3?ids=${ids}`;
   verbose(`Fetching Jupiter prices for ${mints.length} tokens`);
 
   const res = await withRetry(() => fetch(url), {
@@ -29,12 +29,11 @@ async function fetchJupiterPrices(mints: string[]): Promise<Map<string, PriceRes
   });
 
   if (!res.ok) throw new Error(`Jupiter price API error: ${res.status}`);
-  const data = await res.json() as { data: Record<string, { price: string }> };
+  const data = await res.json() as Record<string, { usdPrice: number }>;
 
-  for (const [mint, info] of Object.entries(data.data || {})) {
-    if (info?.price) {
-      const priceUsd = parseFloat(info.price);
-      results.set(mint, { mint, priceUsd, source: 'jupiter' });
+  for (const [mint, info] of Object.entries(data)) {
+    if (info?.usdPrice) {
+      results.set(mint, { mint, priceUsd: info.usdPrice, source: 'jupiter' });
     }
   }
 

@@ -37,11 +37,11 @@ export class JupiterTokenProvider implements TokenMetadataProvider {
     const data = await res.json() as any[];
 
     return data.map(t => ({
-      mint: t.address,
+      mint: t.address || t.id,
       symbol: t.symbol,
       name: t.name,
       decimals: t.decimals,
-      logoUri: t.logoURI,
+      logoUri: t.logoURI || t.icon,
       tags: t.tags,
     }));
   }
@@ -66,11 +66,11 @@ export class JupiterTokenProvider implements TokenMetadataProvider {
 
       for (const t of data) {
         results.push({
-          mint: t.address,
+          mint: t.address || t.id,
           symbol: t.symbol,
           name: t.name,
           decimals: t.decimals,
-          logoUri: t.logoURI,
+          logoUri: t.logoURI || t.icon,
           tags: t.tags,
         });
       }
