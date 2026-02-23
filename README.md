@@ -38,9 +38,13 @@ No API keys required. No SDK integration. Just commands and JSON.
 ## Install
 
 ```bash
-git clone <repo> && cd sol
-npm install
-npm link          # makes `sol` available globally
+npm install -g @solana-compass/cli
+```
+
+Or run without installing:
+
+```bash
+npx @solana-compass/cli wallet list
 ```
 
 Requires Node.js >= 20.
