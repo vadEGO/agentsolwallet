@@ -32,6 +32,7 @@ export interface StakeAccountInfo {
   validator?: string;
   activationEpoch?: number;
   deactivationEpoch?: number;
+  claimableExcess: number;
 }
 
 export interface CreateStakeResult {
@@ -50,6 +51,18 @@ export interface WithdrawStakeResult {
   signature?: string;
   explorerUrl?: string;
   message: string;
+}
+
+export interface ClaimMevResult {
+  action: 'compounded' | 'withdrawn';
+  stakeAccount: string;
+  validator?: string;
+  amountSol: number;
+  withdrawSignature: string;
+  withdrawExplorerUrl: string;
+  newStakeAccount?: string;
+  stakeSignature?: string;
+  stakeExplorerUrl?: string;
 }
 
 // ── Read operations ───────────────────────────────────────
@@ -71,18 +84,29 @@ export async function getStakeAccounts(walletAddress: string): Promise<StakeAcco
 
     return accounts.map((acc: any) => {
       const parsed = acc.account.data?.parsed?.info;
+      const stakeType = acc.account.data?.parsed?.type;
       const meta = parsed?.meta;
       const stake = parsed?.stake;
       const lamportVal = Number(acc.account.lamports);
+
+      // Compute claimable MEV excess for delegated accounts
+      let claimableExcess = 0;
+      if (stakeType === 'delegated' && meta && stake?.delegation) {
+        const rentExemptReserve = BigInt(meta.rentExemptReserve || 0);
+        const delegatedStake = BigInt(stake.delegation.stake || 0);
+        const excess = BigInt(lamportVal) - rentExemptReserve - delegatedStake;
+        if (excess > 0n) claimableExcess = lamportsToSol(Number(excess));
+      }
 
       return {
         address: acc.pubkey,
         lamports: lamportVal,
         solBalance: lamportsToSol(lamportVal),
-        status: parsed?.type || 'unknown',
+        status: stakeType || 'unknown',
         validator: stake?.delegation?.voter,
         activationEpoch: stake?.delegation?.activationEpoch ? Number(stake.delegation.activationEpoch) : undefined,
         deactivationEpoch: stake?.delegation?.deactivationEpoch ? Number(stake.delegation.deactivationEpoch) : undefined,
+        claimableExcess,
       };
     });
   } catch (err) {
@@ -340,4 +364,85 @@ async function partialWithdraw(
     explorerUrl: result.explorerUrl,
     message: `Split ${amountSol} SOL into ${splitAccountSigner.address} and deactivated it. After the cooldown epoch, withdraw with:\n  sol stake withdraw ${splitAccountSigner.address} --force`,
   };
+}
+
+// ── Claim MEV ─────────────────────────────────────────────
+
+export async function claimMev(
+  walletName: string,
+  stakeAccountAddress?: string,
+  withdrawOnly?: boolean,
+): Promise<ClaimMevResult[]> {
+  const signer = await loadSigner(walletName);
+  const wallet = await import('../db/repos/wallet-repo.js').then(m => m.getWallet(walletName));
+  if (!wallet) throw new Error(`Wallet "${walletName}" not found`);
+
+  // Get accounts with claimable excess
+  let targets: StakeAccountInfo[];
+  if (stakeAccountAddress) {
+    const all = await getStakeAccounts(wallet.address);
+    const match = all.find(a => a.address === stakeAccountAddress);
+    if (!match) throw new Error(`Stake account ${stakeAccountAddress} not found`);
+    if (match.claimableExcess <= 0) throw new Error('No claimable MEV on this account');
+    targets = [match];
+  } else {
+    const all = await getStakeAccounts(wallet.address);
+    targets = all.filter(a => a.claimableExcess > 0);
+    if (targets.length === 0) throw new Error('No claimable MEV across any stake accounts');
+  }
+
+  const results: ClaimMevResult[] = [];
+
+  for (const target of targets) {
+    const stakeAddr = address(target.address);
+    const excessLamports = solToLamports(target.claimableExcess);
+
+    verbose(`Claiming ${target.claimableExcess} SOL MEV from ${target.address}`);
+
+    // Withdraw the excess
+    const withdrawIx = getWithdrawInstruction({
+      stake: stakeAddr,
+      recipient: signer.address,
+      stakeHistory: STAKE_HISTORY_SYSVAR,
+      withdrawAuthority: signer,
+      args: excessLamports,
+    });
+
+    const withdrawResult = await buildAndSendTransaction([withdrawIx], signer, {
+      txType: 'mev-claim',
+      walletName,
+    });
+
+    if (withdrawOnly) {
+      results.push({
+        action: 'withdrawn',
+        stakeAccount: target.address,
+        validator: target.validator,
+        amountSol: target.claimableExcess,
+        withdrawSignature: withdrawResult.signature,
+        withdrawExplorerUrl: withdrawResult.explorerUrl,
+      });
+    } else {
+      // Compound: re-stake with the same validator
+      const stakeResult = await createAndDelegateStake(
+        walletName,
+        target.claimableExcess,
+        target.validator,
+      );
+
+      results.push({
+        action: 'compounded',
+        stakeAccount: target.address,
+        validator: target.validator,
+        amountSol: target.claimableExcess,
+        withdrawSignature: withdrawResult.signature,
+        withdrawExplorerUrl: withdrawResult.explorerUrl,
+        newStakeAccount: stakeResult.stakeAccount,
+        stakeSignature: stakeResult.signature,
+        stakeExplorerUrl: stakeResult.explorerUrl,
+      });
+    }
+  }
+
+  return results;
 }

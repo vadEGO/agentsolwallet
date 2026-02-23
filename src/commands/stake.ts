@@ -3,6 +3,7 @@ import {
   getStakeAccounts,
   createAndDelegateStake,
   withdrawStake,
+  claimMev,
   SOLANA_COMPASS_VOTE,
 } from '../core/stake-service.js';
 import { getDefaultWalletName } from '../core/wallet-manager.js';
@@ -27,14 +28,15 @@ export function registerStakeCommand(program: Command): void {
         const { result: accounts, elapsed_ms } = await timed(() => getStakeAccounts(wallet.address));
 
         if (isJsonMode()) {
-          output(success({ wallet: walletName, accounts }, { elapsed_ms }));
+          const totalClaimable = accounts.reduce((s, a) => s + a.claimableExcess, 0);
+          output(success({ wallet: walletName, accounts, totalClaimable }, { elapsed_ms }));
         } else if (accounts.length === 0) {
           console.log('No stake accounts found.');
         } else {
           console.log(table(
             accounts.map(a => ({
               address: shortenAddress(a.address, 6),
-              balance: `${a.solBalance.toFixed(4)} SOL`,
+              balance: `${a.solBalance.toFixed(4)} SOL${a.claimableExcess > 0 ? ' *' : ''}`,
               status: a.status,
               validator: a.validator ? shortenAddress(a.validator, 6) : '—',
             })),
@@ -45,6 +47,12 @@ export function registerStakeCommand(program: Command): void {
               { key: 'validator', header: 'Validator' },
             ]
           ));
+
+          const claimable = accounts.filter(a => a.claimableExcess > 0);
+          if (claimable.length > 0) {
+            const total = claimable.reduce((s, a) => s + a.claimableExcess, 0);
+            console.log(`\n* ${total.toFixed(6)} SOL claimable MEV across ${claimable.length} account${claimable.length > 1 ? 's' : ''}. Run \`sol stake claim-mev\` to compound.`);
+          }
         }
       } catch (err: any) {
         output(failure('STAKE_LIST_FAILED', err.message));
@@ -109,6 +117,44 @@ export function registerStakeCommand(program: Command): void {
         }
       } catch (err: any) {
         output(failure('STAKE_WITHDRAW_FAILED', err.message));
+        process.exitCode = 1;
+      }
+    });
+
+  stake
+    .command('claim-mev [stakeAccount]')
+    .description('Claim MEV tips from stake accounts (default: compound by re-staking)')
+    .option('--wallet <name>', 'Wallet to use')
+    .option('--withdraw', 'Withdraw to wallet instead of compounding')
+    .action(async (stakeAccount: string | undefined, opts) => {
+      try {
+        const walletName = opts.wallet || getDefaultWalletName();
+
+        const { result: results, elapsed_ms } = await timed(() =>
+          claimMev(walletName, stakeAccount, opts.withdraw)
+        );
+
+        if (isJsonMode()) {
+          output(success(results, { elapsed_ms }));
+        } else {
+          for (const r of results) {
+            if (r.action === 'compounded') {
+              console.log(`Compounded ${r.amountSol.toFixed(6)} SOL from ${shortenAddress(r.stakeAccount, 6)}`);
+              console.log(`  New stake account: ${r.newStakeAccount}`);
+              console.log(`  Withdraw tx: ${r.withdrawExplorerUrl}`);
+              console.log(`  Stake tx: ${r.stakeExplorerUrl}`);
+            } else {
+              console.log(`Withdrew ${r.amountSol.toFixed(6)} SOL MEV from ${shortenAddress(r.stakeAccount, 6)}`);
+              console.log(`  Tx: ${r.withdrawExplorerUrl}`);
+            }
+          }
+          const total = results.reduce((s, r) => s + r.amountSol, 0);
+          if (results.length > 1) {
+            console.log(`\nTotal: ${total.toFixed(6)} SOL ${results[0].action === 'compounded' ? 'compounded' : 'withdrawn'}`);
+          }
+        }
+      } catch (err: any) {
+        output(failure('STAKE_CLAIM_MEV_FAILED', err.message));
         process.exitCode = 1;
       }
     });
