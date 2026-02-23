@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 import { getRpc } from '../core/rpc.js';
+import { SOLANA_COMPASS_VOTE } from '../core/stake-service.js';
 import { output, success, failure, isJsonMode, timed, verbose } from '../output/formatter.js';
 import { withRetry, isRetryableHttpError } from '../utils/retry.js';
 
@@ -21,6 +22,7 @@ interface NetworkStatus {
   inflationValidator: number | null;
   inflationFoundation: number | null;
   stakingApy: number | null;
+  compassApy: number | null;
 }
 
 export function registerNetworkCommand(program: Command): void {
@@ -60,8 +62,14 @@ export function registerNetworkCommand(program: Command): void {
 
           // Fetch staking APY from StakeWiz (non-critical)
           let stakingApy: number | null = null;
+          let compassApy: number | null = null;
           try {
-            stakingApy = await fetchStakingApy();
+            const [clusterApy, validatorApy] = await Promise.all([
+              fetchStakingApy(),
+              fetchValidatorApy(SOLANA_COMPASS_VOTE),
+            ]);
+            stakingApy = clusterApy;
+            compassApy = validatorApy;
           } catch (err) {
             verbose(`StakeWiz API failed: ${err}`);
           }
@@ -95,6 +103,7 @@ export function registerNetworkCommand(program: Command): void {
             inflationValidator: inflationRate ? inflationRate.validator * 100 : null,
             inflationFoundation: inflationRate ? inflationRate.foundation * 100 : null,
             stakingApy,
+            compassApy,
           };
 
           return status;
@@ -118,7 +127,7 @@ Slot         ${data.absoluteSlot}
 TPS          ${data.tps !== null ? `~${data.tps.toLocaleString()}` : 'unavailable'}
 Version      ${data.version ?? 'unavailable'}
 Inflation    ${data.inflationTotal !== null ? `${data.inflationTotal.toFixed(2)}%` : 'unavailable'}
-Staking APY  ${data.stakingApy !== null ? `~${data.stakingApy.toFixed(2)}%` : 'unavailable'}
+Staking APY  ${data.stakingApy !== null ? `~${data.stakingApy.toFixed(2)}% (network average)` : 'unavailable'}${data.compassApy !== null ? `\nCompass APY  ~${data.compassApy.toFixed(2)}% (incl. MEV)` : ''}
 `);
         }
       } catch (err: any) {
@@ -142,6 +151,24 @@ async function fetchStakingApy(): Promise<number | null> {
   // StakeWiz returns avg_apy already as a percentage (e.g., 4.67 for 4.67%)
   if (typeof data?.avg_apy === 'number') {
     return data.avg_apy;
+  }
+  return null;
+}
+
+async function fetchValidatorApy(voteAccount: string): Promise<number | null> {
+  const res = await withRetry(
+    () => fetch(`https://api.stakewiz.com/validator/${voteAccount}`, {
+      signal: AbortSignal.timeout(5000),
+    }),
+    { maxRetries: 1, shouldRetry: isRetryableHttpError }
+  );
+
+  if (!res.ok) return null;
+
+  const data = await res.json() as any;
+  // total_apy includes staking rewards + Jito MEV tips
+  if (typeof data?.total_apy === 'number') {
+    return data.total_apy;
   }
   return null;
 }
