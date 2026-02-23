@@ -8,6 +8,8 @@ import { registerStakeCommand } from './commands/stake.js';
 import { registerLendCommand } from './commands/lend.js';
 import { registerLpCommand } from './commands/lp.js';
 import { registerSnapshotCommand } from './commands/snapshot.js';
+import { registerTxCommand } from './commands/tx.js';
+import { registerNetworkCommand } from './commands/network.js';
 import { closeDb } from './db/database.js';
 
 const program = new Command();
@@ -35,6 +37,8 @@ registerStakeCommand(program);
 registerLendCommand(program);
 registerLpCommand(program);
 registerSnapshotCommand(program);
+registerTxCommand(program);
+registerNetworkCommand(program);
 
 // Graceful cleanup
 process.on('exit', () => { closeDb(); });

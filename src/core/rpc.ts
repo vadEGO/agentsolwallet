@@ -1,6 +1,6 @@
 import { createSolanaRpc, createSolanaRpcSubscriptions, type Rpc, type SolanaRpcApi } from '@solana/kit';
 import { execSync } from 'node:child_process';
-import { getConfigValue } from './config-manager.js';
+import { getConfigValue, setConfigValue } from './config-manager.js';
 import { warn, verbose } from '../output/formatter.js';
 
 let rpcOverride: string | undefined;
@@ -45,6 +45,8 @@ export function getRpcUrl(): string {
     if (match) {
       verbose(`Using RPC from Solana CLI config: ${match[1]}`);
       cachedUrl = match[1];
+      // Persist so future runs don't need to shell out
+      try { setConfigValue('rpc.url', cachedUrl); } catch { /* non-critical */ }
       return cachedUrl;
     }
   } catch {

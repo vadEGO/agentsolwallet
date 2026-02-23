@@ -1,15 +1,16 @@
 import { Command } from 'commander';
 import { resolveToken, resolveTokens, syncTokenCache } from '../core/token-registry.js';
 import { getPrices, getPrice } from '../core/price-service.js';
-import { getTokenBalances } from '../core/token-service.js';
+import { getTokenBalances, getAllTokenAccounts, type TokenAccountInfo } from '../core/token-service.js';
 import { getQuote, executeSwap } from '../core/swap-service.js';
 import { getDefaultWalletName, loadSigner } from '../core/wallet-manager.js';
-import { output, success, failure, isJsonMode, timed } from '../output/formatter.js';
+import { output, success, failure, isJsonMode, timed, verbose } from '../output/formatter.js';
 import { table } from '../output/table.js';
-import { isValidAddress, solToLamports, uiToTokenAmount, SOL_MINT } from '../utils/solana.js';
+import { isValidAddress, solToLamports, uiToTokenAmount, explorerUrl, SOL_MINT } from '../utils/solana.js';
 import { buildAndSendTransaction } from '../core/transaction.js';
-import { address } from '@solana/kit';
+import { address, type IInstruction } from '@solana/kit';
 import { getTransferSolInstruction } from '@solana-program/system';
+import { getBurnCheckedInstruction, getCloseAccountInstruction } from '@solana-program/token';
 import * as walletRepo from '../db/repos/wallet-repo.js';
 
 export function registerTokenCommand(program: Command): void {
@@ -247,6 +248,317 @@ export function registerTokenCommand(program: Command): void {
         }
       } catch (err: any) {
         output(failure('SEND_FAILED', err.message));
+        process.exitCode = 1;
+      }
+    });
+
+  // ── Burn ────────────────────────────────────────────────────
+
+  token
+    .command('burn <symbol> [amount]')
+    .description('Burn tokens from wallet')
+    .option('--all', 'Burn entire balance')
+    .option('--close', 'Close the token account after burning')
+    .option('--wallet <name>', 'Wallet to use')
+    .option('--yes', 'Skip confirmation')
+    .action(async (symbol: string, amountStr: string | undefined, opts) => {
+      try {
+        const { result: data, elapsed_ms } = await timed(async () => {
+          const walletName = opts.wallet || getDefaultWalletName();
+          const signer = await loadSigner(walletName);
+          const wallet = walletRepo.getWallet(walletName);
+          if (!wallet) throw new Error(`Wallet "${walletName}" not found`);
+
+          const tokenMeta = await resolveToken(symbol);
+          if (!tokenMeta) throw new Error(`Unknown token: ${symbol}`);
+          if (tokenMeta.mint === SOL_MINT) throw new Error('Cannot burn native SOL');
+
+          // Find the token account
+          const accounts = await getAllTokenAccounts(wallet.address);
+          const tokenAccount = accounts.find(a => a.mint === tokenMeta.mint);
+          if (!tokenAccount) throw new Error(`No token account found for ${tokenMeta.symbol}`);
+
+          let burnAmount: bigint;
+          if (opts.all) {
+            burnAmount = BigInt(tokenAccount.balance);
+            if (burnAmount === 0n) throw new Error(`Token account for ${tokenMeta.symbol} has zero balance`);
+          } else if (amountStr) {
+            const amount = parseFloat(amountStr);
+            if (isNaN(amount) || amount <= 0) throw new Error('Invalid amount');
+            burnAmount = uiToTokenAmount(amount, tokenMeta.decimals);
+            if (burnAmount > BigInt(tokenAccount.balance)) {
+              throw new Error(`Insufficient balance: have ${tokenAccount.uiBalance}, want to burn ${amount}`);
+            }
+          } else {
+            throw new Error('Specify an amount or use --all');
+          }
+
+          const uiBurnAmount = Number(burnAmount) / Math.pow(10, tokenMeta.decimals);
+
+          if (!opts.yes && !isJsonMode()) {
+            console.log(`Burn ${uiBurnAmount} ${tokenMeta.symbol} from "${walletName}"`);
+            if (opts.close) console.log('  + close token account (reclaim rent)');
+          }
+
+          const instructions: IInstruction[] = [
+            getBurnCheckedInstruction({
+              account: address(tokenAccount.pubkey),
+              mint: address(tokenMeta.mint),
+              authority: signer,
+              amount: burnAmount,
+              decimals: tokenMeta.decimals,
+            }),
+          ];
+
+          // Close account if requested and entire balance is being burned
+          const shouldClose = opts.close && (opts.all || burnAmount === BigInt(tokenAccount.balance));
+          if (shouldClose) {
+            instructions.push(
+              getCloseAccountInstruction({
+                account: address(tokenAccount.pubkey),
+                destination: address(wallet.address),
+                owner: signer,
+              }),
+            );
+          }
+
+          const result = await buildAndSendTransaction(instructions, signer, {
+            txType: 'burn',
+            walletName,
+            fromMint: tokenMeta.mint,
+            fromAmount: String(burnAmount),
+          });
+
+          return {
+            signature: result.signature,
+            token: tokenMeta.symbol,
+            mint: tokenMeta.mint,
+            amountBurned: uiBurnAmount,
+            accountClosed: shouldClose,
+            status: result.status,
+            explorerUrl: result.explorerUrl,
+          };
+        });
+
+        if (isJsonMode()) {
+          output(success(data, { elapsed_ms }));
+        } else {
+          console.log(`\nBurned ${data.amountBurned} ${data.token}`);
+          if (data.accountClosed) console.log('  Account closed (rent reclaimed)');
+          console.log(`  Signature: ${data.signature}`);
+          console.log(`  Explorer: ${data.explorerUrl}`);
+        }
+      } catch (err: any) {
+        output(failure('BURN_FAILED', err.message));
+        process.exitCode = 1;
+      }
+    });
+
+  // ── Close ───────────────────────────────────────────────────
+
+  token
+    .command('close [symbol]')
+    .description('Close token accounts to reclaim rent SOL (~0.002 SOL each)')
+    .option('--burn', 'Burn remaining dust tokens before closing')
+    .option('--all', 'Close everything: swap valuable tokens to SOL, burn dust, close')
+    .option('--wallet <name>', 'Wallet to use')
+    .option('--yes', 'Skip confirmation')
+    .action(async (symbol: string | undefined, opts) => {
+      try {
+        const { result: data, elapsed_ms } = await timed(async () => {
+          const walletName = opts.wallet || getDefaultWalletName();
+          const signer = await loadSigner(walletName);
+          const wallet = walletRepo.getWallet(walletName);
+          if (!wallet) throw new Error(`Wallet "${walletName}" not found`);
+
+          const accounts = await getAllTokenAccounts(wallet.address);
+
+          // If specific token, filter to just that one
+          let targets: TokenAccountInfo[];
+          if (symbol) {
+            const tokenMeta = await resolveToken(symbol);
+            if (!tokenMeta) throw new Error(`Unknown token: ${symbol}`);
+            targets = accounts.filter(a => a.mint === tokenMeta.mint);
+            if (targets.length === 0) throw new Error(`No token account found for ${symbol}`);
+          } else {
+            targets = accounts;
+          }
+
+          if (targets.length === 0) throw new Error('No token accounts to close');
+
+          // Classify accounts
+          const empty: TokenAccountInfo[] = [];
+          const hasDust: TokenAccountInfo[] = [];
+          const hasValue: TokenAccountInfo[] = [];
+
+          const DUST_THRESHOLD_USD = 0.01;
+
+          // Get prices for non-zero accounts
+          const nonZeroMints = targets.filter(a => a.balance !== '0').map(a => a.mint);
+          const prices = nonZeroMints.length > 0 ? await getPrices(nonZeroMints) : new Map();
+
+          for (const account of targets) {
+            if (account.balance === '0') {
+              empty.push(account);
+              continue;
+            }
+
+            const price = prices.get(account.mint);
+            const valueUsd = price ? price.priceUsd * account.uiBalance : null;
+
+            if (valueUsd === null || valueUsd < DUST_THRESHOLD_USD) {
+              hasDust.push(account);
+            } else {
+              hasValue.push(account);
+            }
+          }
+
+          if (!isJsonMode()) {
+            if (empty.length > 0) console.log(`  ${empty.length} empty account(s) — will close`);
+            if (hasDust.length > 0) console.log(`  ${hasDust.length} dust account(s) (< $0.01)${opts.burn || opts.all ? ' — will burn + close' : ' — use --burn to burn + close'}`);
+            if (hasValue.length > 0) console.log(`  ${hasValue.length} account(s) with value${opts.all ? ' — will swap to SOL + close' : ' — use --all to swap + close'}`);
+          }
+
+          const results: Array<{
+            account: string;
+            mint: string;
+            symbol: string;
+            action: string;
+            signature?: string;
+            explorerUrl?: string;
+          }> = [];
+
+          // 1. Handle --all: swap valuable tokens to SOL first
+          if (opts.all && hasValue.length > 0) {
+            for (const account of hasValue) {
+              if (account.mint === SOL_MINT) continue;
+              try {
+                if (!isJsonMode()) console.log(`  Swapping ${account.uiBalance} ${account.symbol} to SOL...`);
+                const swapResult = await executeSwap(
+                  account.symbol, 'SOL', account.uiBalance, walletName
+                );
+                results.push({
+                  account: account.pubkey,
+                  mint: account.mint,
+                  symbol: account.symbol,
+                  action: 'swapped',
+                  signature: swapResult.signature,
+                  explorerUrl: swapResult.explorerUrl,
+                });
+                // After swap the account may now be empty — add to close list
+                empty.push(account);
+              } catch (err: any) {
+                verbose(`Failed to swap ${account.symbol}: ${err.message}`);
+                results.push({
+                  account: account.pubkey,
+                  mint: account.mint,
+                  symbol: account.symbol,
+                  action: `swap failed: ${err.message}`,
+                });
+              }
+            }
+          }
+
+          // 2. Burn dust + close, or just close empty
+          const toProcess = [
+            ...empty.map(a => ({ ...a, needsBurn: false })),
+            ...(opts.burn || opts.all ? hasDust.map(a => ({ ...a, needsBurn: true })) : []),
+          ];
+
+          // Batch into transactions (max ~20 accounts per tx to stay under compute limits)
+          const BATCH_SIZE = 20;
+          for (let i = 0; i < toProcess.length; i += BATCH_SIZE) {
+            const batch = toProcess.slice(i, i + BATCH_SIZE);
+            const instructions: IInstruction[] = [];
+
+            for (const account of batch) {
+              if (account.needsBurn && account.balance !== '0') {
+                instructions.push(
+                  getBurnCheckedInstruction({
+                    account: address(account.pubkey),
+                    mint: address(account.mint),
+                    authority: signer,
+                    amount: BigInt(account.balance),
+                    decimals: account.decimals,
+                  }),
+                );
+              }
+
+              instructions.push(
+                getCloseAccountInstruction({
+                  account: address(account.pubkey),
+                  destination: address(wallet.address),
+                  owner: signer,
+                }),
+              );
+            }
+
+            if (instructions.length === 0) continue;
+
+            try {
+              const txResult = await buildAndSendTransaction(instructions, signer, {
+                txType: 'close',
+                walletName,
+              });
+
+              for (const account of batch) {
+                results.push({
+                  account: account.pubkey,
+                  mint: account.mint,
+                  symbol: account.symbol,
+                  action: account.needsBurn ? 'burned + closed' : 'closed',
+                  signature: txResult.signature,
+                  explorerUrl: txResult.explorerUrl,
+                });
+              }
+            } catch (err: any) {
+              for (const account of batch) {
+                results.push({
+                  account: account.pubkey,
+                  mint: account.mint,
+                  symbol: account.symbol,
+                  action: `failed: ${err.message}`,
+                });
+              }
+            }
+          }
+
+          // Accounts that weren't processed (have value but no --all, dust but no --burn)
+          const skippedValue = opts.all ? [] : hasValue;
+          const skippedDust = (opts.burn || opts.all) ? [] : hasDust;
+
+          return {
+            closed: results.filter(r => r.action.includes('closed')).length,
+            burned: results.filter(r => r.action.includes('burned')).length,
+            swapped: results.filter(r => r.action === 'swapped').length,
+            failed: results.filter(r => r.action.includes('failed')).length,
+            skippedWithValue: skippedValue.length,
+            skippedWithDust: skippedDust.length,
+            rentReclaimed: results.filter(r => r.action.includes('closed')).length * 0.00203,
+            accounts: results,
+          };
+        });
+
+        if (isJsonMode()) {
+          output(success(data, { elapsed_ms }));
+        } else {
+          console.log(`\nClosed ${data.closed} account(s)`);
+          if (data.burned > 0) console.log(`  Burned dust in ${data.burned} account(s)`);
+          if (data.swapped > 0) console.log(`  Swapped ${data.swapped} token(s) to SOL`);
+          if (data.failed > 0) console.log(`  Failed: ${data.failed}`);
+          if (data.rentReclaimed > 0) console.log(`  Rent reclaimed: ~${data.rentReclaimed.toFixed(5)} SOL`);
+          if (data.skippedWithValue > 0) console.log(`  Skipped ${data.skippedWithValue} account(s) with value (use --all)`);
+          if (data.skippedWithDust > 0) console.log(`  Skipped ${data.skippedWithDust} dust account(s) (use --burn)`);
+          if (data.accounts.length > 0) {
+            const sigs = [...new Set(data.accounts.filter(a => a.signature).map(a => a.signature))];
+            for (const sig of sigs) {
+              console.log(`  Tx: ${explorerUrl(sig!)}`);
+            }
+          }
+          console.log('');
+        }
+      } catch (err: any) {
+        output(failure('CLOSE_FAILED', err.message));
         process.exitCode = 1;
       }
     });

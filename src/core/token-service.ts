@@ -74,3 +74,57 @@ export async function getTokenBalances(walletAddress: string): Promise<TokenBala
 
   return balances;
 }
+
+// ── Token account info (includes zero-balance, includes account pubkeys) ──
+
+export interface TokenAccountInfo {
+  pubkey: string;        // token account address
+  mint: string;
+  symbol: string;
+  name: string;
+  decimals: number;
+  balance: string;       // raw amount string
+  uiBalance: number;
+}
+
+export async function getAllTokenAccounts(walletAddress: string): Promise<TokenAccountInfo[]> {
+  const rpc = getRpc();
+  const accounts: TokenAccountInfo[] = [];
+
+  try {
+    const tokenAccounts = await rpc.getTokenAccountsByOwner(
+      address(walletAddress),
+      { programId: address('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA') },
+      { encoding: 'jsonParsed' }
+    ).send();
+
+    for (const account of tokenAccounts.value) {
+      const parsed = (account.account.data as any).parsed?.info;
+      if (!parsed) continue;
+
+      const mint = parsed.mint as string;
+      const rawBalance = parsed.tokenAmount?.amount as string ?? '0';
+      const decimals = parsed.tokenAmount?.decimals as number ?? 0;
+      const uiBalance = parsed.tokenAmount?.uiAmount as number ?? 0;
+      const pubkey = String(account.pubkey);
+
+      let symbol = mint.slice(0, 6) + '...';
+      let name = 'Unknown Token';
+      try {
+        const meta = await resolveToken(mint);
+        if (meta) {
+          symbol = meta.symbol;
+          name = meta.name;
+        }
+      } catch {
+        verbose(`Could not resolve metadata for ${mint}`);
+      }
+
+      accounts.push({ pubkey, mint, symbol, name, decimals, balance: rawBalance, uiBalance });
+    }
+  } catch (err) {
+    verbose(`Failed to fetch token accounts: ${err}`);
+  }
+
+  return accounts;
+}
