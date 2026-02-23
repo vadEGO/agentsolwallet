@@ -178,8 +178,21 @@ sol config set rpc.url <url>            # change RPC endpoint
 
 ## Tips
 
-- Use mint addresses instead of symbols when you know the exact token
-  (avoids symbol ambiguity)
+- **Keep SOL for gas.** Every Solana transaction costs ~0.000005 SOL,
+  but token account creation costs ~0.002 SOL. Unless the user
+  specifically asks to drain or close a wallet, keep at least 0.05 SOL
+  as a reserve so future transactions don't fail.
+- **Use full numbers, not shorthand.** The CLI expects literal
+  amounts: `1000000` not `1m`, `50000` not `50k`. Always expand
+  shorthand before passing to a command.
+- **Addresses are raw public keys only.** The CLI does not resolve
+  .sol domains, SNS names, or contact labels — pass the full base58
+  public key for recipients.
+- **Ambiguous symbols pick the highest-liquidity match.** If a symbol
+  maps to multiple tokens, the CLI picks the one with the most
+  trading volume on Jupiter. It does not prompt. Use `sol token info
+  <symbol>` to verify what it resolves to, or pass a mint address
+  to be explicit.
 - Use `--quote-only` on swaps to preview before committing
 - Use `--wallet <name>` to target a specific wallet
 - The transaction log tracks all operations with USD prices at
