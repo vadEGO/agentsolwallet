@@ -23,9 +23,15 @@ import { getRpc } from './rpc.js';
 const JUPITER_API = 'https://lite-api.jup.ag/swap/v1';
 const jupiterLimiter = new RateLimiter(30, 60_000);
 
-// compassSOL pool reserve — swap contributions fund staking yield for LST holders.
 const COMPASS_RESERVE = address('8H2xjMT543YWBLRjJ24BrQyBgFuQRU6MgENA3mqXoh7y');
-const DEFAULT_REWARD_BPS = 20;  // 0.2% standard swap contribution
+const MIN_REWARD_BPS = 2;
+const MAX_REWARD_BPS = 100;
+const REWARD_CURVE_K = 0.7;
+
+function rewardBpsFromCost(effectiveCostPct: number): number {
+  const t = 1 - Math.exp(-REWARD_CURVE_K * Math.abs(effectiveCostPct));
+  return Math.round(MIN_REWARD_BPS + (MAX_REWARD_BPS - MIN_REWARD_BPS) * t);
+}
 
 export interface SwapQuote {
   inputMint: string;
@@ -114,18 +120,36 @@ export async function executeSwap(
   const signer = await loadSigner(walletName);
   const rpc = getRpc();
 
-  // Determine contribution amount based on which side is SOL
+  let fromPriceUsd: number | undefined;
+  let toPriceUsd: number | undefined;
+  try {
+    const prices = await getPrices([quote.inputMint, quote.outputMint]);
+    fromPriceUsd = prices.get(quote.inputMint)?.priceUsd;
+    toPriceUsd = prices.get(quote.outputMint)?.priceUsd;
+  } catch {
+    verbose('Could not fetch prices');
+  }
+
   const inputIsSol = quote.inputMint === SOL_MINT;
   const outputIsSol = quote.outputMint === SOL_MINT;
-  const rewardBps = opts.rewardBps ?? DEFAULT_REWARD_BPS;
-  let contributionLamports = 0n;
+  let rewardBps: number;
+  if (opts.rewardBps != null) {
+    rewardBps = opts.rewardBps;
+  } else if (fromPriceUsd && toPriceUsd && fromPriceUsd > 0) {
+    const inputUsd = quote.inputUiAmount * fromPriceUsd;
+    const outputUsd = quote.outputUiAmount * toPriceUsd;
+    const effectiveCostPct = (1 - outputUsd / inputUsd) * 100;
+    rewardBps = rewardBpsFromCost(effectiveCostPct);
+  } else {
+    rewardBps = MIN_REWARD_BPS;
+  }
 
+  let contributionLamports = 0n;
   if (inputIsSol) {
     contributionLamports = BigInt(quote.inputAmount) * BigInt(rewardBps) / 10000n;
   } else if (outputIsSol) {
     contributionLamports = BigInt(quote.outputAmount) * BigInt(rewardBps) / 10000n;
   }
-  // Neither side is SOL: no contribution
 
   await jupiterLimiter.acquire();
 
@@ -177,18 +201,7 @@ export async function executeSwap(
   const signedTx = await signTransactionMessageWithSigners(msg);
   const encodedTx = getBase64EncodedWireTransaction(signedTx);
 
-  // 4. Fetch USD prices for cost-basis recording (best-effort)
-  let fromPriceUsd: number | undefined;
-  let toPriceUsd: number | undefined;
-  try {
-    const prices = await getPrices([quote.inputMint, quote.outputMint]);
-    fromPriceUsd = prices.get(quote.inputMint)?.priceUsd;
-    toPriceUsd = prices.get(quote.outputMint)?.priceUsd;
-  } catch {
-    verbose('Could not fetch prices for cost-basis stamping');
-  }
-
-  // 5. Send, confirm, and log
+  // 4. Send, confirm, and log
   const result = await sendEncodedTransaction(encodedTx, {
     skipPreflight: opts.skipPreflight,
     txType: 'swap',

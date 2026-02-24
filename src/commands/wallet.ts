@@ -3,7 +3,7 @@ import * as walletManager from '../core/wallet-manager.js';
 import { getSolBalance, getTokenBalances } from '../core/token-service.js';
 import { getPrices } from '../core/price-service.js';
 import { getOnrampUrl } from '../core/onramp-service.js';
-import { setConfigValue } from '../core/config-manager.js';
+import { setConfigValue, isPermitted } from '../core/config-manager.js';
 import { output, success, failure, isJsonMode, timed, fmtPrice } from '../output/formatter.js';
 import { table } from '../output/table.js';
 import * as walletRepo from '../db/repos/wallet-repo.js';
@@ -15,7 +15,7 @@ import { shortenAddress, tokenAmountToUi, SOL_MINT } from '../utils/solana.js';
 export function registerWalletCommand(program: Command): void {
   const wallet = program.command('wallet').description('Wallet management');
 
-  wallet
+  if (isPermitted('canCreateWallet')) wallet
     .command('create')
     .description('Create a new wallet')
     .option('--name <name>', 'Wallet name')
@@ -184,7 +184,7 @@ export function registerWalletCommand(program: Command): void {
       }
     });
 
-  wallet
+  if (isPermitted('canCreateWallet')) wallet
     .command('import <path>')
     .description('Import wallet from keypair file')
     .option('--name <name>', 'Wallet name')
@@ -211,7 +211,7 @@ export function registerWalletCommand(program: Command): void {
       }
     });
 
-  wallet
+  if (isPermitted('canExportWallet')) wallet
     .command('export <name>')
     .description('Show path to wallet key file')
     .action((name: string) => {
@@ -228,7 +228,7 @@ export function registerWalletCommand(program: Command): void {
       }
     });
 
-  wallet
+  if (isPermitted('canRemoveWallet')) wallet
     .command('remove <name>')
     .description('Remove a wallet (key file is kept as .deleted for recovery)')
     .action((name: string) => {

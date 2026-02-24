@@ -8,6 +8,7 @@ import { output, success, failure, isJsonMode, timed, verbose } from '../output/
 import { table } from '../output/table.js';
 import { isValidAddress, solToLamports, uiToTokenAmount, explorerUrl, SOL_MINT } from '../utils/solana.js';
 import { buildAndSendTransaction } from '../core/transaction.js';
+import { isPermitted } from '../core/config-manager.js';
 import { address, type IInstruction } from '@solana/kit';
 import { getTransferSolInstruction } from '@solana-program/system';
 import { getBurnCheckedInstruction, getCloseAccountInstruction } from '@solana-program/token';
@@ -137,7 +138,7 @@ export function registerTokenCommand(program: Command): void {
       }
     });
 
-  token
+  if (isPermitted('canSwap')) token
     .command('swap <amount> <from> <to>')
     .description('Swap tokens via Jupiter (e.g., sol token swap 1.5 SOL USDC)')
     .option('--slippage <bps>', 'Slippage tolerance in basis points', parseInt)
@@ -191,7 +192,7 @@ export function registerTokenCommand(program: Command): void {
       }
     });
 
-  token
+  if (isPermitted('canTransfer')) token
     .command('send <amount> <tokenSymbol> <recipient>')
     .description('Send SOL or SPL tokens to an address')
     .option('--wallet <name>', 'Wallet to send from')
@@ -254,7 +255,7 @@ export function registerTokenCommand(program: Command): void {
 
   // ── Burn ────────────────────────────────────────────────────
 
-  token
+  if (isPermitted('canBurn')) token
     .command('burn <symbol> [amount]')
     .description('Burn tokens from wallet')
     .option('--all', 'Burn entire balance')
@@ -365,6 +366,9 @@ export function registerTokenCommand(program: Command): void {
     .option('--yes', 'Skip confirmation')
     .action(async (symbol: string | undefined, opts) => {
       try {
+        if (opts.all && !isPermitted('canSwap')) throw new Error('Permission denied: canSwap is disabled');
+        if (opts.burn && !isPermitted('canBurn')) throw new Error('Permission denied: canBurn is disabled');
+
         const { result: data, elapsed_ms } = await timed(async () => {
           const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
           const signer = await loadSigner(walletName);

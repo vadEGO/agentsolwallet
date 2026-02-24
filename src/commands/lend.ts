@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import * as lendService from '../core/lend-service.js';
 import { getDefaultWalletName, resolveWalletName } from '../core/wallet-manager.js';
+import { isPermitted } from '../core/config-manager.js';
 import { output, success, failure, isJsonMode, timed } from '../output/formatter.js';
 import { table } from '../output/table.js';
 import * as walletRepo from '../db/repos/wallet-repo.js';
@@ -11,28 +12,31 @@ export function registerLendCommand(program: Command): void {
   // ── rates ───────────────────────────────────────────────
 
   lend
-    .command('rates <token>')
-    .description('Show Kamino deposit/borrow APY for a token')
-    .action(async (token: string) => {
+    .command('rates [tokens...]')
+    .description('Show Kamino deposit/borrow APY (all reserves, or filter by token)')
+    .action(async (tokens: string[]) => {
       try {
-        const { result: rates, elapsed_ms } = await timed(() => lendService.getRates(token));
+        const filterTokens = tokens.length > 0 ? tokens : undefined;
+        const { result: rates, elapsed_ms } = await timed(() => lendService.getRates(filterTokens));
 
         if (isJsonMode()) {
-          output(success({ token, rates }, { elapsed_ms }));
+          output(success({ tokens: filterTokens ?? 'all', rates }, { elapsed_ms }));
         } else if (rates.length === 0) {
-          console.log(`No Kamino lending reserve found for "${token}".`);
+          const label = filterTokens ? filterTokens.join(', ') : 'any tokens';
+          console.log(`No Kamino lending reserves found for ${label}.`);
         } else {
-          const r = rates[0];
-          console.log(`Kamino Lending — ${r.token}\n`);
+          console.log(`Kamino Lending Rates${filterTokens ? ' — ' + rates.map(r => r.token).join(', ') : ''}\n`);
           console.log(table(
-            [{
+            rates.map(r => ({
+              token: r.token,
               depositApy: `${(r.depositApy * 100).toFixed(2)}%`,
               borrowApy: `${(r.borrowApy * 100).toFixed(2)}%`,
               utilization: `${r.utilizationPct.toFixed(1)}%`,
               totalDeposited: fmtLargeAmount(r.totalDeposited),
               totalBorrowed: fmtLargeAmount(r.totalBorrowed),
-            }],
+            })),
             [
+              { key: 'token', header: 'Token' },
               { key: 'depositApy', header: 'Deposit APY', align: 'right' },
               { key: 'borrowApy', header: 'Borrow APY', align: 'right' },
               { key: 'utilization', header: 'Utilization', align: 'right' },
@@ -40,7 +44,7 @@ export function registerLendCommand(program: Command): void {
               { key: 'totalBorrowed', header: 'Total Borrowed', align: 'right' },
             ]
           ));
-          console.log(`\nRun \`sol lend deposit <amount> ${token}\` to start earning.`);
+          console.log(`\nRun \`sol lend deposit <amount> <token>\` to start earning.`);
         }
       } catch (err: any) {
         output(failure('LEND_RATES_FAILED', err.message));
@@ -130,7 +134,7 @@ export function registerLendCommand(program: Command): void {
 
   // ── deposit ─────────────────────────────────────────────
 
-  lend
+  if (isPermitted('canLend')) lend
     .command('deposit <amount> <token>')
     .description('Deposit into Kamino lending vault')
     .option('--wallet <name>', 'Wallet to use')
@@ -159,7 +163,7 @@ export function registerLendCommand(program: Command): void {
 
   // ── withdraw ────────────────────────────────────────────
 
-  lend
+  if (isPermitted('canWithdrawLend')) lend
     .command('withdraw <amount> <token>')
     .description('Withdraw from Kamino lending position (use "max" for full withdrawal)')
     .option('--wallet <name>', 'Wallet to use')
@@ -188,7 +192,7 @@ export function registerLendCommand(program: Command): void {
 
   // ── borrow ──────────────────────────────────────────────
 
-  lend
+  if (isPermitted('canLend')) lend
     .command('borrow <amount> <token>')
     .description('Borrow against collateral on Kamino')
     .option('--collateral <token>', 'Collateral token (required)')
@@ -225,7 +229,7 @@ export function registerLendCommand(program: Command): void {
 
   // ── repay ───────────────────────────────────────────────
 
-  lend
+  if (isPermitted('canWithdrawLend')) lend
     .command('repay <amount> <token>')
     .description('Repay a Kamino loan (use "max" to repay full debt)')
     .option('--wallet <name>', 'Wallet to use')

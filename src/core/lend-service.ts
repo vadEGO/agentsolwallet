@@ -112,34 +112,38 @@ async function getUserObligation(market: KaminoMarket, walletAddress: string): P
 
 // ── Read operations ───────────────────────────────────────
 
-export async function getRates(token: string): Promise<LendingRate[]> {
-  verbose(`Fetching Kamino lending rates for ${token}`);
-
-  const meta = await resolveTokenStrict(token);
+export async function getRates(tokens?: string[]): Promise<LendingRate[]> {
   const market = await loadMarket();
-
-  const reserve = market.getReserveByMint(kAddress(meta.mint)) as KaminoReserve | undefined;
-  if (!reserve) return [];
-
   const slot = await getCurrentSlot();
-  const supplyApy = reserve.totalSupplyAPY(slot);
-  const borrowApy = reserve.totalBorrowAPY(slot);
-  const utilization = reserve.calculateUtilizationRatio();
 
-  const mintFactor = Math.pow(10, reserve.getMintDecimals());
-  const totalDeposited = reserve.getTotalSupply().toNumber() / mintFactor;
-  const totalBorrowed = reserve.getBorrowedAmount().toNumber() / mintFactor;
+  let reserves: KaminoReserve[];
 
-  return [{
-    protocol: 'kamino',
-    token: meta.symbol,
-    mint: meta.mint,
-    depositApy: supplyApy,
-    borrowApy: borrowApy,
-    totalDeposited,
-    totalBorrowed,
-    utilizationPct: utilization * 100,
-  }];
+  if (tokens && tokens.length > 0) {
+    verbose(`Fetching Kamino lending rates for ${tokens.join(', ')}`);
+    reserves = [];
+    for (const token of tokens) {
+      const meta = await resolveTokenStrict(token);
+      const reserve = market.getReserveByMint(kAddress(meta.mint)) as KaminoReserve | undefined;
+      if (reserve) reserves.push(reserve);
+    }
+  } else {
+    verbose('Fetching all Kamino lending rates');
+    reserves = market.getReserves();
+  }
+
+  return reserves.map(reserve => {
+    const mintFactor = Math.pow(10, reserve.getMintDecimals());
+    return {
+      protocol: 'kamino',
+      token: reserve.getTokenSymbol(),
+      mint: String(reserve.getLiquidityMint()),
+      depositApy: reserve.totalSupplyAPY(slot),
+      borrowApy: reserve.totalBorrowAPY(slot),
+      totalDeposited: reserve.getTotalSupply().toNumber() / mintFactor,
+      totalBorrowed: reserve.getBorrowedAmount().toNumber() / mintFactor,
+      utilizationPct: reserve.calculateUtilizationRatio() * 100,
+    };
+  });
 }
 
 export async function getPositions(walletAddress: string): Promise<LendingPosition[]> {

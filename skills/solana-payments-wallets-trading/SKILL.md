@@ -202,6 +202,43 @@ sol config set rpc.url <url>            # change RPC endpoint
 - The transaction log tracks all operations with USD prices at
   execution time — useful for cost basis and P&L
 
+## Permissions
+
+The CLI supports fine-grained permissions via `~/.sol/config.toml`. When a permission is set to `false`, the gated commands are not registered — they won't appear in `--help` or `sol <group> --help`, and invoking them returns "unknown command".
+
+All permissions default to `true` (omitted = permitted). Example read-only config:
+
+```toml
+[permissions]
+canTransfer = false
+canSwap = false
+canStake = false
+canWithdrawStake = false
+canLend = false
+canWithdrawLend = false
+canBurn = false
+canCreateWallet = false
+canRemoveWallet = false
+canExportWallet = false
+```
+
+| Permission | Gated subcommands |
+|---|---|
+| `canTransfer` | `token send` |
+| `canSwap` | `token swap`, `token close --all` |
+| `canStake` | `stake new` |
+| `canWithdrawStake` | `stake withdraw`, `stake claim-mev` |
+| `canLend` | `lend deposit`, `lend borrow` |
+| `canWithdrawLend` | `lend withdraw`, `lend repay` |
+| `canBurn` | `token burn`, `token close --burn` |
+| `canCreateWallet` | `wallet create`, `wallet import` |
+| `canRemoveWallet` | `wallet remove` |
+| `canExportWallet` | `wallet export` |
+
+Read-only commands (`token price/info/list`, `wallet list/balance`, `stake list`, `lend rates/positions`, `portfolio`, `network`, `tx`) are always available regardless of permissions.
+
+Permissions cannot be changed via `sol config set` — they must be edited in `config.toml` directly.
+
 ## Troubleshooting
 
 See references/troubleshooting.md for common issues (RPC rate limits,

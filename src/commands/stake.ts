@@ -7,6 +7,7 @@ import {
   SOLANA_COMPASS_VOTE,
 } from '../core/stake-service.js';
 import { getDefaultWalletName, resolveWalletName } from '../core/wallet-manager.js';
+import { isPermitted } from '../core/config-manager.js';
 import { output, success, failure, isJsonMode, timed } from '../output/formatter.js';
 import { table } from '../output/table.js';
 import { shortenAddress } from '../utils/solana.js';
@@ -60,7 +61,7 @@ export function registerStakeCommand(program: Command): void {
       }
     });
 
-  stake
+  if (isPermitted('canStake')) stake
     .command('new <amount>')
     .description('Create a stake account and delegate to a validator')
     .option('--wallet <name>', 'Wallet to use')
@@ -90,7 +91,7 @@ export function registerStakeCommand(program: Command): void {
       }
     });
 
-  stake
+  if (isPermitted('canWithdrawStake')) stake
     .command('withdraw <stakeAccount> [amount]')
     .description('Withdraw from a stake account (smart: deactivates if needed, splits for partial)')
     .option('--wallet <name>', 'Wallet to use')
@@ -121,7 +122,7 @@ export function registerStakeCommand(program: Command): void {
       }
     });
 
-  stake
+  if (isPermitted('canWithdrawStake')) stake
     .command('claim-mev [stakeAccount]')
     .description('Claim MEV tips from stake accounts (default: compound by re-staking)')
     .option('--wallet <name>', 'Wallet to use')

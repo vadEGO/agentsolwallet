@@ -3,12 +3,26 @@ import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { parse, stringify } from 'smol-toml';
 
+export interface Permissions {
+  canTransfer?: boolean;
+  canSwap?: boolean;
+  canStake?: boolean;
+  canWithdrawStake?: boolean;
+  canLend?: boolean;
+  canWithdrawLend?: boolean;
+  canBurn?: boolean;
+  canCreateWallet?: boolean;
+  canRemoveWallet?: boolean;
+  canExportWallet?: boolean;
+}
+
 export interface SolConfig {
   rpc?: { url?: string };
   api?: { heliusApiKey?: string };
   onramp?: { provider?: string; transakApiKey?: string; sphereKey?: string };
   fees?: { yieldFeeBps?: number; jupiterReferralAccount?: string };
   defaults?: { wallet?: string; slippageBps?: number; priorityFee?: string };
+  permissions?: Permissions;
   [key: string]: unknown;
 }
 
@@ -52,7 +66,15 @@ export function getConfigValue(key: string): unknown {
   return current;
 }
 
+export function isPermitted(name: string): boolean {
+  const perms = readConfig().permissions;
+  return perms?.[name as keyof Permissions] !== false;
+}
+
 export function setConfigValue(key: string, value: string): void {
+  if (key.startsWith('permissions.'))
+    throw new Error('Permission settings cannot be changed via CLI. Edit config.toml directly.');
+
   const config = readConfig();
   const parts = key.split('.');
 

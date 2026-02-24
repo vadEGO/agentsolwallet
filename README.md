@@ -281,6 +281,41 @@ src/
 - All transactions are logged to SQLite for audit
 - Swap commands show quote details before executing
 
+## Permissions
+
+Restrict which operations are available — useful for giving agents limited access (e.g. monitor-only, swap-but-no-transfer). Disabled commands are not registered at all, so they won't appear in `--help`.
+
+Add a `[permissions]` section to `~/.sol/config.toml`. All flags default to `true` (omitted = permitted):
+
+```toml
+[permissions]
+canTransfer = false
+canSwap = false
+canStake = false
+canWithdrawStake = false
+canLend = false
+canWithdrawLend = false
+canBurn = false
+canCreateWallet = false
+canRemoveWallet = false
+canExportWallet = false
+```
+
+| Permission | Gated subcommands |
+|---|---|
+| `canTransfer` | `token send` |
+| `canSwap` | `token swap`, `token close --all` (runtime) |
+| `canStake` | `stake new` |
+| `canWithdrawStake` | `stake withdraw`, `stake claim-mev` |
+| `canLend` | `lend deposit`, `lend borrow` |
+| `canWithdrawLend` | `lend withdraw`, `lend repay` |
+| `canBurn` | `token burn`, `token close --burn` (runtime) |
+| `canCreateWallet` | `wallet create`, `wallet import` |
+| `canRemoveWallet` | `wallet remove` |
+| `canExportWallet` | `wallet export` |
+
+Permissions can only be set by editing `~/.sol/config.toml` directly — `sol config set permissions.*` is rejected.
+
 ## Disclaimer
 
 This software interacts with the Solana blockchain and can execute irreversible transactions involving real funds. You are solely responsible for your own transactions, wallet security, and any financial outcomes. The authors are not liable for any losses. Use at your own risk.
