@@ -9,7 +9,7 @@ description: >-
 license: MIT
 metadata:
   author: solanaguide
-  version: 0.2.2
+  version: 0.2.3
   openclaw:
     requires:
       bins:
@@ -29,8 +29,18 @@ no API keys to configure.
 
 ## Get Set Up
 
+Prefer `npx` — it always runs the latest version with no global
+install to manage:
+
 ```bash
-npm install -g @solana-compass/cli
+npx @solana-compass/cli config set rpc.url https://your-rpc-endpoint.com
+npx @solana-compass/cli wallet create --name my-wallet
+```
+
+If the user has installed globally (`npm install -g @solana-compass/cli`),
+you can use the shorter `sol` command instead:
+
+```bash
 sol config set rpc.url https://your-rpc-endpoint.com
 sol wallet create --name my-wallet
 ```
@@ -38,12 +48,6 @@ sol wallet create --name my-wallet
 The public RPC endpoint rate-limits aggressively. Use a dedicated RPC
 for anything beyond testing — Helius, Triton, and QuickNode all offer
 free tiers.
-
-Or run without installing:
-
-```bash
-npx @solana-compass/cli wallet list
-```
 
 Requires Node.js >= 20.
 

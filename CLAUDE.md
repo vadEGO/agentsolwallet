@@ -130,6 +130,28 @@ When adding new transaction types, always pass meaningful `txType`, `fromMint`/`
 
 Snapshots capture portfolio state at a point in time. The `snapshot_entries` table has `position_type` ('token', 'stake', 'lend', 'lp') and `protocol` fields. When saving a snapshot, include ALL position types — not just tokens.
 
+## Agent Skill Distribution
+
+The CLI is published as a discoverable agent skill via three channels:
+
+- **Claude Code plugin** — `.claude-plugin/marketplace.json` + `plugin.json` at repo root. Auto-discovered from GitHub.
+- **skills.sh** — `skills/solana-payments-wallets-trading/SKILL.md` + `references/`. Discovered via npm package.
+- **ClawdHub** — same skill directory, published separately.
+
+### Versioning
+
+When bumping the version, update ALL of these in sync:
+1. `package.json` → `version`
+2. `.claude-plugin/plugin.json` → `version`
+3. `.claude-plugin/marketplace.json` → `plugins[0].version`
+4. `skills/solana-payments-wallets-trading/SKILL.md` → frontmatter `version`
+
+**Plugin users** get updates when they run `/plugin marketplace update solanaguide-solana-cli` or enable auto-update (disabled by default for third-party marketplaces). If you don't bump the version, the update is skipped — Claude Code treats same-version as unchanged.
+
+**skills.sh users** get updates when they re-run `npx skills add solanaguide/solana-cli` (pulls latest from npm). There's no global update command.
+
+Always `npm publish` after pushing so both channels are in sync.
+
 ## Testing
 
 Run `npm test` (Node.js native test runner). For manual end-to-end testing against mainnet, use small amounts (0.01 SOL). The public RPC rate-limits aggressively — set a proper RPC via `sol config set rpc.url`.
