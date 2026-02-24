@@ -2,6 +2,7 @@ import { getWellKnownBySymbol, getWellKnownByMint } from '../utils/token-list.js
 import * as tokenRepo from '../db/repos/token-repo.js';
 import { verbose } from '../output/formatter.js';
 import { withRetry, isRetryableHttpError } from '../utils/retry.js';
+import { getJupiterBaseUrl, getJupiterHeaders } from '../utils/jupiter-api.js';
 
 // Pluggable provider interface
 export interface TokenMetadata {
@@ -22,13 +23,12 @@ export interface TokenMetadataProvider {
 // Jupiter Token API v2 provider
 export class JupiterTokenProvider implements TokenMetadataProvider {
   name = 'jupiter';
-  private baseUrl = 'https://lite-api.jup.ag';
 
   async search(query: string): Promise<TokenMetadata[]> {
-    const url = `${this.baseUrl}/tokens/v2/search?query=${encodeURIComponent(query)}`;
+    const url = `${getJupiterBaseUrl()}/tokens/v2/search?query=${encodeURIComponent(query)}`;
     verbose(`Fetching token metadata: ${url}`);
 
-    const res = await withRetry(() => fetch(url), {
+    const res = await withRetry(() => fetch(url, { headers: getJupiterHeaders() }), {
       maxRetries: 2,
       shouldRetry: isRetryableHttpError,
     });
@@ -53,10 +53,10 @@ export class JupiterTokenProvider implements TokenMetadataProvider {
     const results: TokenMetadata[] = [];
     for (let i = 0; i < mints.length; i += 100) {
       const batch = mints.slice(i, i + 100);
-      const url = `${this.baseUrl}/tokens/v2/${batch.join(',')}`;
+      const url = `${getJupiterBaseUrl()}/tokens/v2/${batch.join(',')}`;
       verbose(`Fetching token metadata for ${batch.length} mints`);
 
-      const res = await withRetry(() => fetch(url), {
+      const res = await withRetry(() => fetch(url, { headers: getJupiterHeaders() }), {
         maxRetries: 2,
         shouldRetry: isRetryableHttpError,
       });

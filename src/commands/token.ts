@@ -4,7 +4,7 @@ import { getPrices, getPrice } from '../core/price-service.js';
 import { getTokenBalances, getAllTokenAccounts, type TokenAccountInfo } from '../core/token-service.js';
 import { getQuote, executeSwap } from '../core/swap-service.js';
 import { getDefaultWalletName, resolveWalletName, loadSigner } from '../core/wallet-manager.js';
-import { output, success, failure, isJsonMode, timed, verbose } from '../output/formatter.js';
+import { output, success, failure, isJsonMode, timed, verbose, fmtPrice } from '../output/formatter.js';
 import { table } from '../output/table.js';
 import { isValidAddress, solToLamports, uiToTokenAmount, explorerUrl, SOL_MINT } from '../utils/solana.js';
 import { buildAndSendTransaction } from '../core/transaction.js';
@@ -13,6 +13,7 @@ import { address, type IInstruction } from '@solana/kit';
 import { getTransferSolInstruction } from '@solana-program/system';
 import { getBurnCheckedInstruction, getCloseAccountInstruction } from '@solana-program/token';
 import * as walletRepo from '../db/repos/wallet-repo.js';
+import { getCategories, browseTokens } from '../core/token-lists.js';
 
 export function registerTokenCommand(program: Command): void {
   const token = program.command('token').description('Token operations');
@@ -134,6 +135,69 @@ export function registerTokenCommand(program: Command): void {
         }
       } catch (err: any) {
         output(failure('TOKEN_SYNC_FAILED', err.message));
+        process.exitCode = 1;
+      }
+    });
+
+  // ── Browse ──────────────────────────────────────────────────
+
+  token
+    .command('browse [category]')
+    .description('Browse token lists — trending, top-traded, recent, and more')
+    .option('--interval <interval>', 'Time interval: 5m, 1h, 6h, 24h', '1h')
+    .option('--limit <n>', 'Number of results', parseInt, 20)
+    .action(async (category: string | undefined, opts) => {
+      try {
+        if (!category) {
+          // List available categories
+          const categories = getCategories();
+          if (isJsonMode()) {
+            output(success(categories));
+          } else {
+            console.log('Available categories:\n');
+            for (const cat of categories) {
+              const interval = cat.supportsInterval ? ' (supports --interval)' : '';
+              console.log(`  ${cat.id.padEnd(14)} ${cat.description}${interval}`);
+            }
+            console.log('\nUsage: sol token browse <category> [--interval 1h] [--limit 20]');
+          }
+          return;
+        }
+
+        const { result: entries, elapsed_ms } = await timed(() =>
+          browseTokens(category, { interval: opts.interval, limit: opts.limit })
+        );
+
+        if (isJsonMode()) {
+          output(success(entries, { elapsed_ms }));
+        } else {
+          console.log(`${category} tokens${opts.interval !== '1h' ? ` (${opts.interval})` : ''}:\n`);
+          if (entries.length === 0) {
+            console.log('  No results.');
+          } else {
+            console.log(table(
+              entries.map((e, i) => ({
+                rank: String(i + 1),
+                symbol: e.symbol || '???',
+                name: e.name.length > 24 ? e.name.slice(0, 22) + '..' : e.name,
+                price: e.priceUsd != null ? `$${fmtPrice(e.priceUsd)}` : '—',
+                change24h: e.change24hPct != null ? `${e.change24hPct >= 0 ? '+' : ''}${e.change24hPct.toFixed(1)}%` : '—',
+                volume: e.volume24hUsd != null ? fmtVolume(e.volume24hUsd) : '—',
+              })),
+              [
+                { key: 'rank', header: '#', align: 'right' },
+                { key: 'symbol', header: 'Symbol' },
+                { key: 'name', header: 'Name' },
+                { key: 'price', header: 'Price', align: 'right' },
+                { key: 'change24h', header: '24h', align: 'right' },
+                { key: 'volume', header: 'Volume 24h', align: 'right' },
+              ]
+            ));
+          }
+          console.log(`\nRun \`sol token info <symbol>\` for details, or \`sol token swap <amount> <from> <to>\` to trade.`);
+        }
+      } catch (err: any) {
+        output(failure('TOKEN_BROWSE_FAILED', err.message));
         process.exitCode = 1;
       }
     });
@@ -579,4 +643,11 @@ export function registerTokenCommand(program: Command): void {
         process.exitCode = 1;
       }
     });
+}
+
+function fmtVolume(v: number): string {
+  if (v >= 1_000_000_000) return `$${(v / 1_000_000_000).toFixed(1)}B`;
+  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000) return `$${(v / 1_000).toFixed(1)}K`;
+  return `$${v.toFixed(0)}`;
 }

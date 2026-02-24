@@ -96,6 +96,10 @@ Wallets are stored locally as key files. The first wallet created becomes the de
 ### token — Prices, swaps, transfers, and account management
 
 ```bash
+sol token browse trending                    # Discover trending tokens
+sol token browse top-traded --interval 24h   # Most traded over 24h
+sol token browse lst                         # Liquid staking tokens
+
 sol token price sol                           # Current SOL price
 sol token price sol usdc bonk                 # Multiple prices at once
 sol token info bonk                           # Token metadata (mint, decimals)

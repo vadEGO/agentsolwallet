@@ -2,6 +2,7 @@ import { withRetry, isRetryableHttpError, RateLimiter } from '../utils/retry.js'
 import { verbose } from '../output/formatter.js';
 import { resolveToken } from './token-registry.js';
 import { uiToTokenAmount, SOL_MINT } from '../utils/solana.js';
+import { getJupiterBaseUrl, getJupiterHeaders } from '../utils/jupiter-api.js';
 import { loadSigner } from './wallet-manager.js';
 import {
   getTransactionDecoder,
@@ -20,7 +21,9 @@ import { sendEncodedTransaction } from './transaction.js';
 import { getPrices } from './price-service.js';
 import { getRpc } from './rpc.js';
 
-const JUPITER_API = 'https://lite-api.jup.ag/swap/v1';
+function getJupiterSwapUrl(): string {
+  return `${getJupiterBaseUrl()}/swap/v1`;
+}
 const jupiterLimiter = new RateLimiter(30, 60_000);
 
 const COMPASS_RESERVE = address('8H2xjMT543YWBLRjJ24BrQyBgFuQRU6MgENA3mqXoh7y');
@@ -76,10 +79,10 @@ export async function getQuote(
 
   await jupiterLimiter.acquire();
 
-  const url = `${JUPITER_API}/quote?inputMint=${inputToken.mint}&outputMint=${outputToken.mint}&amount=${inputAmount}&slippageBps=${slippageBps}`;
+  const url = `${getJupiterSwapUrl()}/quote?inputMint=${inputToken.mint}&outputMint=${outputToken.mint}&amount=${inputAmount}&slippageBps=${slippageBps}`;
   verbose(`Fetching Jupiter quote: ${url}`);
 
-  const res = await withRetry(() => fetch(url), {
+  const res = await withRetry(() => fetch(url, { headers: getJupiterHeaders() }), {
     maxRetries: 2,
     shouldRetry: isRetryableHttpError,
   });
@@ -155,9 +158,9 @@ export async function executeSwap(
 
   // Get swap transaction from Jupiter — pass the raw quote response
   const swapRes = await withRetry(
-    () => fetch(`${JUPITER_API}/swap`, {
+    () => fetch(`${getJupiterSwapUrl()}/swap`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getJupiterHeaders() },
       body: JSON.stringify({
         quoteResponse: quote._raw,
         userPublicKey: signer.address,

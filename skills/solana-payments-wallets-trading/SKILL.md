@@ -67,6 +67,23 @@ automatically in `--json` mode.
 
 See references/trading-commands.md for the full send reference.
 
+## Discover Tokens
+
+Browse the Solana token ecosystem — trending, most traded, recently
+launched, and more.
+
+```bash
+sol token browse trending                    # what's hot right now
+sol token browse top-traded --interval 24h   # highest volume over 24h
+sol token browse recent --limit 10           # just launched
+sol token browse lst                         # liquid staking tokens
+```
+
+Results populate the local token cache, so subsequent `token info` and
+`token price` calls resolve instantly.
+
+See references/trading-commands.md for all categories and flags.
+
 ## Buy and Sell Tokens
 
 Swap any token for any other token. Prices come from Jupiter — best
@@ -235,7 +252,7 @@ canExportWallet = false
 | `canRemoveWallet` | `wallet remove` |
 | `canExportWallet` | `wallet export` |
 
-Read-only commands (`token price/info/list`, `wallet list/balance`, `stake list`, `lend rates/positions`, `portfolio`, `network`, `tx`) are always available regardless of permissions.
+Read-only commands (`token browse/price/info/list`, `wallet list/balance`, `stake list`, `lend rates/positions`, `portfolio`, `network`, `tx`) are always available regardless of permissions.
 
 Permissions cannot be changed via `sol config set` — they must be edited in `config.toml` directly.
 

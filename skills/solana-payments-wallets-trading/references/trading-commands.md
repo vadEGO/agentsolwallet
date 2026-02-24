@@ -1,5 +1,66 @@
 # Trading Commands Reference
 
+## Browse Tokens
+
+```bash
+sol token browse [category]
+```
+
+Discover tokens by category — what's trending, what's traded most, what just launched.
+
+### Categories
+
+| Category | Description |
+|----------|-------------|
+| `trending` | Top trending tokens by search + trade activity |
+| `top-traded` | Most traded tokens by volume |
+| `top-organic` | Highest organic score (real vs wash trading) |
+| `recent` | Recently launched tokens |
+| `lst` | Liquid staking tokens |
+| `verified` | Jupiter-verified tokens |
+
+### Examples
+
+```bash
+sol token browse                             # list available categories
+sol token browse trending                    # trending tokens (default 1h interval)
+sol token browse top-traded --interval 24h   # most traded over 24h
+sol token browse top-organic --interval 6h   # highest organic score
+sol token browse recent --limit 10           # 10 most recently launched
+sol token browse lst                         # liquid staking tokens
+sol token browse verified --limit 50         # top 50 verified tokens
+```
+
+### Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--interval <interval>` | 1h | Time window: `5m`, `1h`, `6h`, `24h` (trending, top-traded, top-organic only) |
+| `--limit <n>` | 20 | Number of results to show |
+
+### JSON Output
+
+```json
+{
+  "ok": true,
+  "data": [
+    {
+      "mint": "9BB6...pump",
+      "symbol": "Fartcoin",
+      "name": "Fartcoin",
+      "decimals": 6,
+      "priceUsd": 0.14,
+      "volume24hUsd": 23400000,
+      "change24hPct": 6.7,
+      "metadata": { "organicScore": 95.7, "holderCount": 165304 }
+    }
+  ],
+  "meta": { "elapsed_ms": 450 }
+}
+```
+
+Browse results are recycled into the local token cache, so `sol token info` and `sol token price` resolve instantly for any token you've browsed.
+
 ## Swap Tokens
 
 ```bash

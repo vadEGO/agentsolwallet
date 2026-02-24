@@ -18,7 +18,7 @@ export interface Permissions {
 
 export interface SolConfig {
   rpc?: { url?: string };
-  api?: { heliusApiKey?: string };
+  api?: { heliusApiKey?: string; jupiterApiKey?: string };
   onramp?: { provider?: string; transakApiKey?: string; sphereKey?: string };
   fees?: { yieldFeeBps?: number; jupiterReferralAccount?: string };
   defaults?: { wallet?: string; slippageBps?: number; priorityFee?: string };

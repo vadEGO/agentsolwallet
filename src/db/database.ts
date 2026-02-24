@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { getSolDir, ensureSolDir } from '../core/config-manager.js';
 import { migration001 } from './migrations/001_initial.js';
 import { migration002 } from './migrations/002_tx_prices.js';
+import { migration003 } from './migrations/003_token_lists.js';
 
 const DB_PATH = join(getSolDir(), 'data.db');
 
@@ -35,6 +36,7 @@ interface MigrationRecord {
 const migrations: MigrationRecord[] = [
   { id: 1, name: '001_initial', sql: migration001 },
   { id: 2, name: '002_tx_prices', sql: migration002 },
+  { id: 3, name: '003_token_lists', sql: migration003 },
 ];
 
 function runMigrations(database: Database.Database): void {

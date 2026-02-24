@@ -2,6 +2,7 @@ import { withRetry, isRetryableHttpError, RateLimiter } from '../utils/retry.js'
 import { verbose } from '../output/formatter.js';
 import * as priceRepo from '../db/repos/price-repo.js';
 import { SOL_MINT } from '../utils/solana.js';
+import { getJupiterBaseUrl, getJupiterHeaders } from '../utils/jupiter-api.js';
 
 const jupiterLimiter = new RateLimiter(30, 60_000); // 30 req/min
 const coingeckoLimiter = new RateLimiter(25, 60_000); // 25 req/min (conservative)
@@ -20,10 +21,10 @@ async function fetchJupiterPrices(mints: string[]): Promise<Map<string, PriceRes
   await jupiterLimiter.acquire();
 
   const ids = mints.join(',');
-  const url = `https://lite-api.jup.ag/price/v3?ids=${ids}`;
+  const url = `${getJupiterBaseUrl()}/price/v3?ids=${ids}`;
   verbose(`Fetching Jupiter prices for ${mints.length} tokens`);
 
-  const res = await withRetry(() => fetch(url), {
+  const res = await withRetry(() => fetch(url, { headers: getJupiterHeaders() }), {
     maxRetries: 2,
     shouldRetry: isRetryableHttpError,
   });
