@@ -192,10 +192,13 @@ The portfolio aggregates tokens, staked SOL, and Kamino lending positions across
 
 ```bash
 sol config set rpc.url https://my-rpc.com     # Set RPC endpoint
+sol config set api.jupiterApiKey YOUR_KEY     # Optional Jupiter API key
 sol config get rpc.url                         # Read a value
 sol config list                                # Show all settings
 sol config path                                # Config file location
 ```
+
+By default, Sol uses Jupiter's lite API for zero-config operation. In the future it may be necessary to request a free API key from [portal.jup.ag](https://portal.jup.ag).
 
 ### Other commands
 
@@ -323,6 +326,10 @@ Permissions can only be set by editing `~/.sol/config.toml` directly — `sol co
 ## Disclaimer
 
 This software interacts with the Solana blockchain and can execute irreversible transactions involving real funds. You are solely responsible for your own transactions, wallet security, and any financial outcomes. The authors are not liable for any losses. Use at your own risk.
+
+## Tips
+
+Token swaps include a small tip (2–100 bps, typically under 10 bps) paid to the compassSOL reserve, which boosts staking yield for Solana Compass delegators. The rate scales with swap cost — liquid pairs like SOL/USDC pay the minimum.
 
 ## License
 

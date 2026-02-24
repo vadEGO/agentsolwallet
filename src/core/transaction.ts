@@ -16,6 +16,7 @@ import { getRpc } from './rpc.js';
 import { verbose } from '../output/formatter.js';
 import { getDb } from '../db/database.js';
 import { explorerUrl } from '../utils/solana.js';
+import { createNoopInstruction } from '../utils/noop.js';
 
 export enum ErrorClass {
   RETRYABLE_TRANSIENT = 'RETRYABLE_TRANSIENT',
@@ -146,7 +147,7 @@ export async function buildAndSendTransaction(
         createTransactionMessage({ version: 0 }),
         m => setTransactionMessageFeePayer(payer.address, m),
         m => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, m),
-        m => appendTransactionMessageInstructions(instructions, m),
+        m => appendTransactionMessageInstructions([...instructions, createNoopInstruction()], m),
       );
 
       const signedTx = await signTransactionMessageWithSigners(message);

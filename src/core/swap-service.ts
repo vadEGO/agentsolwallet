@@ -18,6 +18,7 @@ import {
 } from '@solana/kit';
 import { getTransferSolInstruction } from '@solana-program/system';
 import { sendEncodedTransaction } from './transaction.js';
+import { createNoopInstruction } from '../utils/noop.js';
 import { getPrices } from './price-service.js';
 import { getRpc } from './rpc.js';
 
@@ -199,12 +200,15 @@ export async function executeSwap(
     msg = appendTransactionMessageInstructions([transferIx], msg) as typeof msg;
   }
 
-  // 3. Sign and encode
+  // 3. Append noop for on-chain tracking
+  msg = appendTransactionMessageInstructions([createNoopInstruction()], msg) as typeof msg;
+
+  // 4. Sign and encode
   verbose('Signing swap transaction...');
   const signedTx = await signTransactionMessageWithSigners(msg);
   const encodedTx = getBase64EncodedWireTransaction(signedTx);
 
-  // 4. Send, confirm, and log
+  // 5. Send, confirm, and log
   const result = await sendEncodedTransaction(encodedTx, {
     skipPreflight: opts.skipPreflight,
     txType: 'swap',
