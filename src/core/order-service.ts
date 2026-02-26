@@ -559,6 +559,7 @@ export async function getOpenOrders(walletAddress: string): Promise<OpenOrderPos
         deposited,
         used,
         received: o.outReceived,
+        fillPct: deposited > 0 ? (used / deposited) * 100 : 0,
       },
     });
   }
@@ -583,8 +584,14 @@ export async function getOpenOrders(walletAddress: string): Promise<OpenOrderPos
       valueUsd: price ? remainingUi * price.priceUsd : null,
       status: o.status,
       extra: {
+        makingAmount: Number(o.makingAmount || '0'),
         takingAmount: o.takingAmount,
         createdAt: o.createdAt,
+        fillPct: (() => {
+          const total = Number(o.makingAmount || '0');
+          const remaining = Number(o.remainingMakingAmount || o.makingAmount || '0');
+          return total > 0 ? ((total - remaining) / total) * 100 : 0;
+        })(),
       },
     });
   }
