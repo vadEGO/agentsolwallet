@@ -1,32 +1,36 @@
-import { table } from './table.js';
+import { table, type Column } from './table.js';
 import type { PortfolioReport, CompareResult } from '../core/portfolio-service.js';
 
-const BAR_WIDTH = 30;
 const FILL_BAR_WIDTH = 8;
 
 // ── Section builder ──────────────────────────────────────
 
+interface TableSpec {
+  rows: Record<string, unknown>[];
+  columns: Column[];
+}
+
 interface Section {
   title: string;
   body: string;
+  tableSpec?: TableSpec;   // present when body came from table() — enables re-render at panel width
   footnote?: string;
+}
+
+function buildTableSection(title: string, spec: TableSpec, footnote?: string): Section {
+  return { title, body: table(spec.rows, spec.columns), tableSpec: spec, footnote };
 }
 
 function sectionHeader(title: string, width: number): string {
   const fill = Math.max(0, width - title.length - 4);
-  return `── ${title} ${'─'.repeat(fill)}`;
+  return `\u2500\u2500 ${title} ${'\u2500'.repeat(fill)}`;
 }
 
-function panelWidth(sections: Section[]): number {
-  let max = 56; // minimum
+function measureWidth(sections: Section[]): number {
+  let max = 56;
   for (const s of sections) {
     for (const line of s.body.split('\n')) {
       if (line.length > max) max = line.length;
-    }
-    if (s.footnote) {
-      for (const line of s.footnote.split('\n')) {
-        if (line.length > max) max = line.length;
-      }
     }
   }
   return max;
@@ -54,25 +58,22 @@ export function renderPortfolio(report: PortfolioReport): string {
     }
     const rows = [...grouped.values()].sort((a, b) => (b.valueUsd ?? 0) - (a.valueUsd ?? 0));
 
-    sections.push({
-      title: 'Tokens',
-      body: table(
-        rows.map(r => ({
-          token: r.symbol,
-          balance: fmtAmount(r.amount),
-          value: r.valueUsd != null ? `$${fmt(r.valueUsd)}` : '—',
-          pct: r.valueUsd != null && report.totalValueUsd > 0
-            ? `${((r.valueUsd / report.totalValueUsd) * 100).toFixed(1)}%`
-            : '',
-        })),
-        [
-          { key: 'token', header: 'Token' },
-          { key: 'balance', header: 'Balance', align: 'right' },
-          { key: 'value', header: 'Value', align: 'right' },
-          { key: 'pct', header: '%', align: 'right' },
-        ],
-      ),
-    });
+    sections.push(buildTableSection('Tokens', {
+      rows: rows.map(r => ({
+        token: r.symbol,
+        balance: fmtAmount(r.amount),
+        value: r.valueUsd != null ? `$${fmt(r.valueUsd)}` : '\u2014',
+        pct: r.valueUsd != null && report.totalValueUsd > 0
+          ? `${((r.valueUsd / report.totalValueUsd) * 100).toFixed(1)}%`
+          : '',
+      })),
+      columns: [
+        { key: 'token', header: 'Token' },
+        { key: 'balance', header: 'Balance', align: 'right' },
+        { key: 'value', header: 'Value', align: 'right' },
+        { key: 'pct', header: '%', align: 'right' },
+      ],
+    }));
   }
 
   // ── Staking ──
@@ -80,33 +81,29 @@ export function renderPortfolio(report: PortfolioReport): string {
   if (stakePositions.length > 0) {
     let footnote: string | undefined;
     if (report.claimableMev > 0) {
-      footnote = `  * ${fmtAmount(report.claimableMev)} SOL claimable MEV — sol stake claim-mev`;
+      footnote = `  * ${fmtAmount(report.claimableMev)} SOL claimable MEV \u2014 sol stake claim-mev`;
     }
-    sections.push({
-      title: 'Staking',
-      body: table(
-        stakePositions.map(p => {
-          const addr = String(p.extra?.stakeAccount ?? '');
-          const short = addr.length > 12 ? `${addr.slice(0, 4)}..${addr.slice(-5)}` : addr;
-          const validator = String(p.extra?.validator ?? '—');
-          const validatorShort = validator.length > 12 ? `${validator.slice(0, 6)}..${validator.slice(-4)}` : validator;
-          const excess = p.extra?.claimableExcess as number ?? 0;
-          return {
-            account: short,
-            staked: `${fmtAmount(p.amount)} SOL`,
-            validator: validatorShort,
-            mev: excess > 0 ? `${fmtAmount(excess)} SOL *` : '—',
-          };
-        }),
-        [
-          { key: 'account', header: 'Account' },
-          { key: 'staked', header: 'Staked', align: 'right' },
-          { key: 'validator', header: 'Validator' },
-          { key: 'mev', header: 'MEV', align: 'right' },
-        ],
-      ),
-      footnote,
-    });
+    sections.push(buildTableSection('Staking', {
+      rows: stakePositions.map(p => {
+        const addr = String(p.extra?.stakeAccount ?? '');
+        const short = addr.length > 12 ? `${addr.slice(0, 4)}..${addr.slice(-5)}` : addr;
+        const validator = String(p.extra?.validator ?? '\u2014');
+        const validatorShort = validator.length > 12 ? `${validator.slice(0, 6)}..${validator.slice(-4)}` : validator;
+        const excess = p.extra?.claimableExcess as number ?? 0;
+        return {
+          account: short,
+          staked: `${fmtAmount(p.amount)} SOL`,
+          validator: validatorShort,
+          mev: excess > 0 ? `${fmtAmount(excess)} SOL *` : '\u2014',
+        };
+      }),
+      columns: [
+        { key: 'account', header: 'Account' },
+        { key: 'staked', header: 'Staked', align: 'right' },
+        { key: 'validator', header: 'Validator' },
+        { key: 'mev', header: 'MEV', align: 'right' },
+      ],
+    }, footnote));
   }
 
   // ── Lending ──
@@ -114,22 +111,6 @@ export function renderPortfolio(report: PortfolioReport): string {
   if (lendPositions.length > 0) {
     const deposits = lendPositions.filter(p => p.extra?.side === 'deposit');
     const borrows = lendPositions.filter(p => p.extra?.side === 'borrow');
-    const allLendRows = [
-      ...deposits.map(p => ({
-        type: 'Deposit',
-        token: p.symbol,
-        amount: fmtAmount(p.amount),
-        value: p.valueUsd != null ? `$${fmt(p.valueUsd)}` : '—',
-        apy: p.extra?.apy != null ? `${((p.extra.apy as number) * 100).toFixed(2)}%` : '—',
-      })),
-      ...borrows.map(p => ({
-        type: 'Borrow',
-        token: p.symbol,
-        amount: fmtAmount(p.amount),
-        value: p.valueUsd != null ? `-$${fmt(Math.abs(p.valueUsd))}` : '—',
-        apy: p.extra?.apy != null ? `${((p.extra.apy as number) * 100).toFixed(2)}%` : '—',
-      })),
-    ];
 
     const footnotes: string[] = [];
     const depositTotal = deposits.reduce((s, p) => s + (p.valueUsd ?? 0), 0);
@@ -138,105 +119,107 @@ export function renderPortfolio(report: PortfolioReport): string {
       footnotes.push(`  Net: $${fmt(depositTotal - borrowTotal)}`);
     }
     const healthFactors = borrows.map(p => p.extra?.healthFactor as number).filter(h => h != null && h > 0);
-    if (healthFactors.length > 0) {
-      const minHealth = Math.min(...healthFactors);
-      if (minHealth < 1.1) {
-        footnotes.push(`  ⚠ Health factor ${minHealth.toFixed(2)} — consider repaying or adding collateral`);
-      }
+    if (healthFactors.length > 0 && Math.min(...healthFactors) < 1.1) {
+      footnotes.push(`  Health factor ${Math.min(...healthFactors).toFixed(2)} \u2014 consider repaying or adding collateral`);
     }
 
-    sections.push({
-      title: 'Lending',
-      body: table(allLendRows, [
+    sections.push(buildTableSection('Lending', {
+      rows: [
+        ...deposits.map(p => ({
+          type: 'Deposit',
+          token: p.symbol,
+          amount: fmtAmount(p.amount),
+          value: p.valueUsd != null ? `$${fmt(p.valueUsd)}` : '\u2014',
+          apy: p.extra?.apy != null ? `${((p.extra.apy as number) * 100).toFixed(2)}%` : '\u2014',
+        })),
+        ...borrows.map(p => ({
+          type: 'Borrow',
+          token: p.symbol,
+          amount: fmtAmount(p.amount),
+          value: p.valueUsd != null ? `-$${fmt(Math.abs(p.valueUsd))}` : '\u2014',
+          apy: p.extra?.apy != null ? `${((p.extra.apy as number) * 100).toFixed(2)}%` : '\u2014',
+        })),
+      ],
+      columns: [
         { key: 'type', header: 'Type' },
         { key: 'token', header: 'Token' },
         { key: 'amount', header: 'Amount', align: 'right' },
         { key: 'value', header: 'Value', align: 'right' },
         { key: 'apy', header: 'APY', align: 'right' },
-      ]),
-      footnote: footnotes.length > 0 ? footnotes.join('\n') : undefined,
-    });
+      ],
+    }, footnotes.length > 0 ? footnotes.join('\n') : undefined));
   }
 
   // ── Open Orders ──
   const orderPositions = report.positions.filter(p => p.type === 'order');
   if (orderPositions.length > 0) {
-    sections.push({
-      title: 'Open Orders',
-      body: table(
-        orderPositions.map(p => {
-          const orderType = String(p.extra?.orderType ?? '').toUpperCase();
-          const outputSymbol = String(p.extra?.outputSymbol ?? '?');
-          const orderKey = String(p.extra?.orderKey ?? '');
-          const shortKey = orderKey.length > 12 ? `${orderKey.slice(0, 6)}..${orderKey.slice(-4)}` : orderKey;
-          const fillPct = p.extra?.fillPct as number ?? 0;
-          return {
-            type: orderType,
-            pair: `${p.symbol} → ${outputSymbol}`,
-            remaining: fmtAmount(p.amount) + ' ' + p.symbol,
-            value: p.valueUsd != null ? `$${fmt(p.valueUsd)}` : '—',
-            filled: miniBar(fillPct),
-            key: shortKey,
-          };
-        }),
-        [
-          { key: 'type', header: 'Type' },
-          { key: 'pair', header: 'Pair' },
-          { key: 'remaining', header: 'Remaining', align: 'right' },
-          { key: 'value', header: 'Value', align: 'right' },
-          { key: 'filled', header: 'Filled', align: 'right' },
-          { key: 'key', header: 'Key' },
-        ],
-      ),
-    });
+    sections.push(buildTableSection('Open Orders', {
+      rows: orderPositions.map(p => {
+        const orderType = String(p.extra?.orderType ?? '').toUpperCase();
+        const outputSymbol = String(p.extra?.outputSymbol ?? '?');
+        const orderKey = String(p.extra?.orderKey ?? '');
+        const shortKey = orderKey.length > 12 ? `${orderKey.slice(0, 6)}..${orderKey.slice(-4)}` : orderKey;
+        const fillPct = p.extra?.fillPct as number ?? 0;
+        return {
+          type: orderType,
+          pair: `${p.symbol} \u2192 ${outputSymbol}`,
+          remaining: fmtAmount(p.amount) + ' ' + p.symbol,
+          value: p.valueUsd != null ? `$${fmt(p.valueUsd)}` : '\u2014',
+          filled: miniBar(fillPct),
+          key: shortKey,
+        };
+      }),
+      columns: [
+        { key: 'type', header: 'Type' },
+        { key: 'pair', header: 'Pair' },
+        { key: 'remaining', header: 'Remaining', align: 'right' },
+        { key: 'value', header: 'Value', align: 'right' },
+        { key: 'filled', header: 'Filled', align: 'right' },
+        { key: 'key', header: 'Key' },
+      ],
+    }));
   }
 
   // ── Predictions ──
   const predictPositions = report.positions.filter(p => p.type === 'predict');
   if (predictPositions.length > 0) {
     const claimableCount = predictPositions.filter(p => p.extra?.claimable).length;
-    sections.push({
-      title: 'Predictions',
-      body: table(
-        predictPositions.map(p => {
-          const title = String(p.extra?.marketTitle || p.extra?.eventTitle || '');
-          const shortTitle = title.length > 35 ? title.slice(0, 34) + '\u2026' : title;
-          const cost = p.extra?.costBasis as number ?? 0;
-          const pnl = p.extra?.unrealizedPnl as number ?? null;
-          const pnlStr = pnl != null ? `${pnl >= 0 ? '+' : ''}$${fmt(pnl)}` : '—';
-          const claimable = p.extra?.claimable as boolean ?? false;
-          return {
-            market: shortTitle,
-            side: p.symbol,
-            contracts: fmtAmount(p.amount),
-            cost: `$${fmt(cost)}`,
-            value: p.valueUsd != null ? `$${fmt(p.valueUsd)}` : '—',
-            pnl: pnlStr,
-            status: claimable ? 'claimable' : 'open',
-          };
-        }),
-        [
-          { key: 'market', header: 'Market' },
-          { key: 'side', header: 'Side' },
-          { key: 'contracts', header: 'Contracts', align: 'right' },
-          { key: 'cost', header: 'Cost', align: 'right' },
-          { key: 'value', header: 'Value', align: 'right' },
-          { key: 'pnl', header: 'P&L', align: 'right' },
-          { key: 'status', header: 'Status' },
-        ],
-      ),
-      footnote: claimableCount > 0
-        ? `  ${claimableCount} claimable — sol predict positions`
-        : undefined,
-    });
+    sections.push(buildTableSection('Predictions', {
+      rows: predictPositions.map(p => {
+        const title = String(p.extra?.marketTitle || p.extra?.eventTitle || '');
+        const shortTitle = title.length > 35 ? title.slice(0, 34) + '\u2026' : title;
+        const cost = p.extra?.costBasis as number ?? 0;
+        const pnl = p.extra?.unrealizedPnl as number ?? null;
+        const pnlStr = pnl != null ? `${pnl >= 0 ? '+' : ''}$${fmt(pnl)}` : '\u2014';
+        const claimable = p.extra?.claimable as boolean ?? false;
+        return {
+          market: shortTitle,
+          side: p.symbol,
+          contracts: fmtAmount(p.amount),
+          cost: `$${fmt(cost)}`,
+          value: p.valueUsd != null ? `$${fmt(p.valueUsd)}` : '\u2014',
+          pnl: pnlStr,
+          status: claimable ? 'claimable' : 'open',
+        };
+      }),
+      columns: [
+        { key: 'market', header: 'Market' },
+        { key: 'side', header: 'Side' },
+        { key: 'contracts', header: 'Contracts', align: 'right' },
+        { key: 'cost', header: 'Cost', align: 'right' },
+        { key: 'value', header: 'Value', align: 'right' },
+        { key: 'pnl', header: 'P&L', align: 'right' },
+        { key: 'status', header: 'Status' },
+      ],
+    }, claimableCount > 0 ? `  ${claimableCount} claimable \u2014 sol predict positions` : undefined));
   }
 
-  // ── Allocation ──
+  // ── Allocation (not a table — raw lines) ──
   if (report.allocation.length > 0) {
     const maxSymLen = Math.max(...report.allocation.map(a => a.symbol.length), 4);
     const allocLines = report.allocation.map(a => {
-      const filled = Math.round((a.pct / 100) * BAR_WIDTH);
-      const empty = BAR_WIDTH - filled;
+      const filled = Math.round((a.pct / 100) * 30);
+      const empty = 30 - filled;
       const bar = '\u2588'.repeat(filled) + '\u2591'.repeat(empty);
       const pctStr = `${a.pct.toFixed(1)}%`.padStart(6);
       return `${a.symbol.padEnd(maxSymLen)}  ${bar} ${pctStr}`;
@@ -261,19 +244,29 @@ export function renderPortfolio(report: PortfolioReport): string {
           ? `${((value / report.totalValueUsd) * 100).toFixed(1)}%`
           : '',
       }));
-    sections.push({
-      title: 'Wallets',
-      body: table(walletRows, [
+    sections.push(buildTableSection('Wallets', {
+      rows: walletRows,
+      columns: [
         { key: 'wallet', header: 'Wallet' },
         { key: 'value', header: 'Value', align: 'right' },
         { key: 'pct', header: '%', align: 'right' },
-      ]),
-    });
+      ],
+    }));
   }
 
-  // ── Render ──────────────────────────────────────────────
+  // ── Compute panel width then re-render tables ──────────
 
-  const width = panelWidth(sections);
+  const width = measureWidth(sections);
+
+  // Re-render table sections at uniform width
+  for (const section of sections) {
+    if (section.tableSpec) {
+      section.body = table(section.tableSpec.rows, section.tableSpec.columns, { minWidth: width });
+    }
+  }
+
+  // ── Assemble output ────────────────────────────────────
+
   const lines: string[] = [];
 
   // Header
@@ -301,12 +294,11 @@ export function renderPortfolio(report: PortfolioReport): string {
   }
   lines.push(footerParts.join(' \u00b7 '));
 
-  // Signposts
   const hints: string[] = [];
   if (!report.lastSnapshot) {
-    hints.push('sol portfolio snapshot — save current state');
+    hints.push('sol portfolio snapshot \u2014 save current state');
   } else {
-    hints.push('sol portfolio compare — see changes');
+    hints.push('sol portfolio compare \u2014 see changes');
   }
   if (hints.length > 0) lines.push(hints.join('  '));
 
@@ -330,7 +322,7 @@ export function renderCompare(result: CompareResult, label: string): string {
         before: `$${fmt(d.valueBefore)}`,
         after: `$${fmt(d.valueAfter)}`,
         change: `${d.change >= 0 ? '+' : ''}$${fmt(d.change)}`,
-        pct: d.changePct != null ? `${d.changePct >= 0 ? '+' : ''}${d.changePct.toFixed(1)}%` : '—',
+        pct: d.changePct != null ? `${d.changePct >= 0 ? '+' : ''}${d.changePct.toFixed(1)}%` : '\u2014',
       })),
       [
         { key: 'wallet', header: 'Wallet' },

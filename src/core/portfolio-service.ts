@@ -3,6 +3,7 @@ import { getTokenBalances, type TokenBalance } from './token-service.js';
 import { getStakeAccounts, type StakeAccountInfo } from './stake-service.js';
 import { getPositions as getLendPositions, type LendingPosition } from './lend-service.js';
 import { getOpenOrders, type OpenOrderPosition } from './order-service.js';
+import { getPositions as getPredictPositions, type PredictionPosition } from './predict-service.js';
 import { getPrices, type PriceResult } from './price-service.js';
 import * as snapshotRepo from '../db/repos/snapshot-repo.js';
 import { verbose } from '../output/formatter.js';
@@ -11,7 +12,7 @@ import { SOL_MINT } from '../utils/solana.js';
 // ── Types ─────────────────────────────────────────────────
 
 export interface PortfolioPosition {
-  type: 'token' | 'stake' | 'lend' | 'lp' | 'order';
+  type: 'token' | 'stake' | 'lend' | 'lp' | 'order' | 'predict';
   protocol?: string;
   wallet: string;
   mint: string;
@@ -69,7 +70,7 @@ export async function getPortfolio(walletFilter?: string): Promise<PortfolioRepo
 
   // Fetch token balances, stake accounts, lending positions, and open orders in parallel per wallet
   const walletData = await Promise.all(wallets.map(async (w) => {
-    const [tokens, stakes, lends, orders] = await Promise.all([
+    const [tokens, stakes, lends, orders, predictions] = await Promise.all([
       getTokenBalances(w.address),
       getStakeAccounts(w.address),
       getLendPositions(w.address).catch((err) => {
@@ -80,8 +81,12 @@ export async function getPortfolio(walletFilter?: string): Promise<PortfolioRepo
         verbose(`Could not fetch open orders: ${err}`);
         return [] as OpenOrderPosition[];
       }),
+      getPredictPositions(w.address).catch((err) => {
+        verbose(`Could not fetch prediction positions: ${err}`);
+        return [] as PredictionPosition[];
+      }),
     ]);
-    return { wallet: w, tokens, stakes, lends, orders };
+    return { wallet: w, tokens, stakes, lends, orders, predictions };
   }));
 
   // Collect all mints for batch price fetch
@@ -99,7 +104,7 @@ export async function getPortfolio(walletFilter?: string): Promise<PortfolioRepo
   const positions: PortfolioPosition[] = [];
   let claimableMev = 0;
 
-  for (const { wallet, tokens, stakes, lends, orders } of walletData) {
+  for (const { wallet, tokens, stakes, lends, orders, predictions } of walletData) {
     // Token positions
     for (const t of tokens) {
       const price = prices.get(t.mint);
@@ -171,6 +176,29 @@ export async function getPortfolio(walletFilter?: string): Promise<PortfolioRepo
           outputMint: o.outputMint,
           status: o.status,
           ...o.extra,
+        },
+      });
+    }
+
+    // Prediction positions
+    for (const pred of predictions) {
+      if (pred.status === 'closed' || pred.status === 'lost') continue;
+      positions.push({
+        type: 'predict',
+        protocol: pred.provider,
+        wallet: wallet.name,
+        mint: 'prediction',
+        symbol: pred.isYes ? 'YES' : 'NO',
+        amount: pred.contracts,
+        valueUsd: pred.currentValueUsd,
+        extra: {
+          positionPubkey: pred.pubkey,
+          marketId: pred.marketId,
+          marketTitle: pred.marketTitle,
+          eventTitle: pred.eventTitle,
+          costBasis: pred.costBasisUsd,
+          unrealizedPnl: pred.unrealizedPnlUsd,
+          claimable: pred.claimable,
         },
       });
     }
@@ -253,17 +281,34 @@ export async function takeSnapshot(label?: string, walletFilter?: string): Promi
   };
 }
 
-/** Auto-snapshot if the last one is older than 24h. Returns true if taken. */
-export async function autoSnapshotIfStale(): Promise<boolean> {
+/**
+ * Auto-snapshot from an already-fetched report. Rate-limited to at most once
+ * every 5 minutes to avoid spamming the DB on repeated portfolio views.
+ */
+export async function autoSnapshot(report: PortfolioReport): Promise<boolean> {
   const latest = snapshotRepo.getLatestSnapshot();
-  if (!latest) return false;
+  if (latest) {
+    const ageMs = Date.now() - new Date(latest.created_at).getTime();
+    if (ageMs < 5 * 60 * 1000) return false; // skip if <5 min old
+  }
 
-  const ageMs = Date.now() - new Date(latest.created_at).getTime();
-  const twentyFourHours = 24 * 60 * 60 * 1000;
-  if (ageMs < twentyFourHours) return false;
-
-  verbose('Last snapshot is >24h old, taking auto-snapshot');
-  await takeSnapshot('auto');
+  verbose('Taking auto-snapshot');
+  const snapshotId = snapshotRepo.createSnapshot('auto');
+  for (const p of report.positions) {
+    snapshotRepo.insertSnapshotEntry({
+      snapshot_id: snapshotId,
+      wallet_name: p.wallet,
+      wallet_address: '',
+      mint: p.mint,
+      symbol: p.symbol,
+      balance: String(p.amount),
+      price_usd: p.valueUsd != null && p.amount > 0 ? p.valueUsd / p.amount : null,
+      value_usd: p.valueUsd,
+      position_type: p.type,
+      protocol: p.protocol ?? null,
+      pool_id: (p.extra?.stakeAccount as string) ?? null,
+    });
+  }
   return true;
 }
 

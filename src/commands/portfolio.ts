@@ -18,8 +18,8 @@ export function registerPortfolioCommand(program: Command): void {
           portfolioService.getPortfolio(opts.wallet ? resolveWalletName(opts.wallet) : undefined)
         );
 
-        // Auto-snapshot if stale (fire-and-forget, don't block output)
-        portfolioService.autoSnapshotIfStale().catch(() => {});
+        // Auto-snapshot on every view (rate-limited, fire-and-forget)
+        portfolioService.autoSnapshot(report).catch(() => {});
 
         if (isJsonMode()) {
           output(success(report, { elapsed_ms }));

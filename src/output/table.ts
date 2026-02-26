@@ -6,7 +6,12 @@ export interface Column {
   format?: (value: unknown) => string;
 }
 
-export function table(rows: Record<string, unknown>[], columns: Column[]): string {
+export interface TableOptions {
+  /** Stretch the separator line to at least this width */
+  minWidth?: number;
+}
+
+export function table(rows: Record<string, unknown>[], columns: Column[], opts?: TableOptions): string {
   if (rows.length === 0) return '(no data)';
 
   const formatted = rows.map(row =>
@@ -21,8 +26,12 @@ export function table(rows: Record<string, unknown>[], columns: Column[]): strin
     return Math.max(col.header.length, col.width ?? 0, dataMax);
   });
 
+  const gaps = (columns.length - 1) * 2;
+  const naturalWidth = widths.reduce((s, w) => s + w, 0) + gaps;
+  const targetWidth = Math.max(naturalWidth, opts?.minWidth ?? 0);
+
   const header = columns.map((col, i) => pad(col.header, widths[i], col.align)).join('  ');
-  const separator = widths.map(w => '─'.repeat(w)).join('──');
+  const separator = '─'.repeat(targetWidth);
 
   const body = formatted.map(row =>
     columns.map((col, i) => pad(row[i], widths[i], col.align)).join('  ')
