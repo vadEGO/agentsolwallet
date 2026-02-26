@@ -42,6 +42,7 @@ export function renderPortfolio(report: PortfolioReport): string {
   const sections: Section[] = [];
   const walletCount = report.wallets.length;
   const walletLabel = walletCount === 1 ? '1 wallet' : `${walletCount} wallets`;
+  const walletAddressMap = new Map(report.wallets.map(w => [w.name, w.address]));
 
   // ── Tokens ──
   const tokenPositions = report.positions.filter(p => p.type === 'token' && p.amount > 0);
@@ -237,17 +238,23 @@ export function renderPortfolio(report: PortfolioReport): string {
     }
     const walletRows = [...walletTotals.entries()]
       .sort((a, b) => b[1] - a[1])
-      .map(([name, value]) => ({
-        wallet: name,
-        value: `$${fmt(value)}`,
-        pct: report.totalValueUsd > 0
-          ? `${((value / report.totalValueUsd) * 100).toFixed(1)}%`
-          : '',
-      }));
+      .map(([name, value]) => {
+        const addr = walletAddressMap.get(name) ?? '';
+        const shortAddr = addr.length > 12 ? `${addr.slice(0, 4)}..${addr.slice(-4)}` : addr;
+        return {
+          wallet: name,
+          address: shortAddr,
+          value: `$${fmt(value)}`,
+          pct: report.totalValueUsd > 0
+            ? `${((value / report.totalValueUsd) * 100).toFixed(1)}%`
+            : '',
+        };
+      });
     sections.push(buildTableSection('Wallets', {
       rows: walletRows,
       columns: [
         { key: 'wallet', header: 'Wallet' },
+        { key: 'address', header: 'Address' },
         { key: 'value', header: 'Value', align: 'right' },
         { key: 'pct', header: '%', align: 'right' },
       ],

@@ -7,7 +7,7 @@ export interface Column {
 }
 
 export interface TableOptions {
-  /** Stretch the separator line to at least this width */
+  /** Stretch the table to at least this width by distributing extra space between columns */
   minWidth?: number;
 }
 
@@ -26,15 +26,41 @@ export function table(rows: Record<string, unknown>[], columns: Column[], opts?:
     return Math.max(col.header.length, col.width ?? 0, dataMax);
   });
 
-  const gaps = (columns.length - 1) * 2;
-  const naturalWidth = widths.reduce((s, w) => s + w, 0) + gaps;
+  // Compute gap between columns — default 2, expanded to fill minWidth
+  const numGaps = columns.length - 1;
+  const contentWidth = widths.reduce((s, w) => s + w, 0);
+  const naturalWidth = contentWidth + numGaps * 2;
   const targetWidth = Math.max(naturalWidth, opts?.minWidth ?? 0);
 
-  const header = columns.map((col, i) => pad(col.header, widths[i], col.align)).join('  ');
+  let gapStr: string;
+  if (numGaps > 0 && targetWidth > naturalWidth) {
+    const totalGapSpace = targetWidth - contentWidth;
+    const baseGap = Math.floor(totalGapSpace / numGaps);
+    const remainder = totalGapSpace - baseGap * numGaps;
+    // Build gaps — distribute remainder one extra space to the first N gaps
+    gapStr = ''; // won't use a single string, need per-gap
+  }
+
+  // Per-gap widths for even distribution
+  const gaps: number[] = [];
+  if (numGaps > 0) {
+    const totalGapSpace = targetWidth - contentWidth;
+    const baseGap = Math.floor(totalGapSpace / numGaps);
+    const remainder = totalGapSpace - baseGap * numGaps;
+    for (let i = 0; i < numGaps; i++) {
+      gaps.push(baseGap + (i < remainder ? 1 : 0));
+    }
+  }
+
+  function joinRow(cells: string[]): string {
+    return cells.map((cell, i) => i < cells.length - 1 ? cell + ' '.repeat(gaps[i]) : cell).join('');
+  }
+
+  const header = joinRow(columns.map((col, i) => pad(col.header, widths[i], col.align)));
   const separator = '─'.repeat(targetWidth);
 
   const body = formatted.map(row =>
-    columns.map((col, i) => pad(row[i], widths[i], col.align)).join('  ')
+    joinRow(columns.map((col, i) => pad(row[i], widths[i], col.align)))
   ).join('\n');
 
   return `${header}\n${separator}\n${body}`;

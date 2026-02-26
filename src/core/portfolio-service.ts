@@ -29,7 +29,7 @@ export interface AllocationEntry {
 }
 
 export interface PortfolioReport {
-  wallets: string[];
+  wallets: { name: string; address: string }[];
   positions: PortfolioPosition[];
   allocation: AllocationEntry[];
   totalValueUsd: number;
@@ -234,7 +234,7 @@ export async function getPortfolio(walletFilter?: string): Promise<PortfolioRepo
   }
 
   return {
-    wallets: wallets.map(w => w.name),
+    wallets: wallets.map(w => ({ name: w.name, address: w.address })),
     positions,
     allocation,
     totalValueUsd,
