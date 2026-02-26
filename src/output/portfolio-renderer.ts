@@ -123,6 +123,37 @@ export function renderPortfolio(report: PortfolioReport): string {
     lines.push('');
   }
 
+  // Open Orders section (DCA + limit)
+  const orderPositions = report.positions.filter(p => p.type === 'order');
+  if (orderPositions.length > 0) {
+    lines.push('Open Orders');
+    lines.push(table(
+      orderPositions.map(p => {
+        const orderType = String(p.extra?.orderType ?? '').toUpperCase();
+        const outputSymbol = String(p.extra?.outputSymbol ?? '?');
+        const orderKey = String(p.extra?.orderKey ?? '');
+        const shortKey = orderKey.length > 12 ? `${orderKey.slice(0, 6)}..${orderKey.slice(-4)}` : orderKey;
+        return {
+          type: orderType,
+          pair: `${p.symbol} → ${outputSymbol}`,
+          locked: fmtAmount(p.amount) + ' ' + p.symbol,
+          value: p.valueUsd != null ? `$${fmt(p.valueUsd)}` : '—',
+          status: String(p.extra?.status ?? ''),
+          key: shortKey,
+        };
+      }),
+      [
+        { key: 'type', header: 'Type' },
+        { key: 'pair', header: 'Pair' },
+        { key: 'locked', header: 'Locked', align: 'right' },
+        { key: 'value', header: 'Value', align: 'right' },
+        { key: 'status', header: 'Status' },
+        { key: 'key', header: 'Order Key' },
+      ],
+    ));
+    lines.push('');
+  }
+
   // Allocation bars
   if (report.allocation.length > 0) {
     lines.push('Allocation');

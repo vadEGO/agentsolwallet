@@ -2,6 +2,7 @@ import * as walletManager from './wallet-manager.js';
 import { getTokenBalances, type TokenBalance } from './token-service.js';
 import { getStakeAccounts, type StakeAccountInfo } from './stake-service.js';
 import { getPositions as getLendPositions, type LendingPosition } from './lend-service.js';
+import { getOpenOrders, type OpenOrderPosition } from './order-service.js';
 import { getPrices, type PriceResult } from './price-service.js';
 import * as snapshotRepo from '../db/repos/snapshot-repo.js';
 import { verbose } from '../output/formatter.js';
@@ -10,7 +11,7 @@ import { SOL_MINT } from '../utils/solana.js';
 // ── Types ─────────────────────────────────────────────────
 
 export interface PortfolioPosition {
-  type: 'token' | 'stake' | 'lend' | 'lp';
+  type: 'token' | 'stake' | 'lend' | 'lp' | 'order';
   protocol?: string;
   wallet: string;
   mint: string;
@@ -66,24 +67,29 @@ export async function getPortfolio(walletFilter?: string): Promise<PortfolioRepo
 
   if (wallets.length === 0) throw new Error(`Wallet "${walletFilter}" not found`);
 
-  // Fetch token balances, stake accounts, and lending positions in parallel per wallet
+  // Fetch token balances, stake accounts, lending positions, and open orders in parallel per wallet
   const walletData = await Promise.all(wallets.map(async (w) => {
-    const [tokens, stakes, lends] = await Promise.all([
+    const [tokens, stakes, lends, orders] = await Promise.all([
       getTokenBalances(w.address),
       getStakeAccounts(w.address),
       getLendPositions(w.address).catch((err) => {
         verbose(`Could not fetch lending positions: ${err}`);
         return [] as LendingPosition[];
       }),
+      getOpenOrders(w.address).catch((err) => {
+        verbose(`Could not fetch open orders: ${err}`);
+        return [] as OpenOrderPosition[];
+      }),
     ]);
-    return { wallet: w, tokens, stakes, lends };
+    return { wallet: w, tokens, stakes, lends, orders };
   }));
 
   // Collect all mints for batch price fetch
   const allMints = new Set<string>();
-  for (const { tokens, lends } of walletData) {
+  for (const { tokens, lends, orders } of walletData) {
     for (const t of tokens) allMints.add(t.mint);
     for (const l of lends) allMints.add(l.mint);
+    for (const o of orders) allMints.add(o.inputMint);
   }
   allMints.add(SOL_MINT); // Stake positions need SOL price
 
@@ -93,7 +99,7 @@ export async function getPortfolio(walletFilter?: string): Promise<PortfolioRepo
   const positions: PortfolioPosition[] = [];
   let claimableMev = 0;
 
-  for (const { wallet, tokens, stakes, lends } of walletData) {
+  for (const { wallet, tokens, stakes, lends, orders } of walletData) {
     // Token positions
     for (const t of tokens) {
       const price = prices.get(t.mint);
@@ -144,6 +150,27 @@ export async function getPortfolio(walletFilter?: string): Promise<PortfolioRepo
           side: l.type,
           apy: l.apy,
           healthFactor: l.healthFactor,
+        },
+      });
+    }
+
+    // Open order positions (DCA + limit)
+    for (const o of orders) {
+      positions.push({
+        type: 'order',
+        protocol: o.type === 'dca' ? 'jupiter-recurring' : 'jupiter-trigger',
+        wallet: wallet.name,
+        mint: o.inputMint,
+        symbol: o.inputSymbol || 'unknown',
+        amount: o.remainingInputAmount,
+        valueUsd: o.valueUsd,
+        extra: {
+          orderType: o.type,
+          orderKey: o.orderKey,
+          outputSymbol: o.outputSymbol,
+          outputMint: o.outputMint,
+          status: o.status,
+          ...o.extra,
         },
       });
     }

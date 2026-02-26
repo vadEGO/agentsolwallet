@@ -474,6 +474,124 @@ export async function listLimitOrders(
   }));
 }
 
+// ── Portfolio integration ─────────────────────────────────
+
+export interface OpenOrderPosition {
+  type: 'dca' | 'limit';
+  orderKey: string;
+  inputMint: string;
+  outputMint: string;
+  inputSymbol?: string;
+  outputSymbol?: string;
+  /** Remaining input locked in the order (UI amount) */
+  remainingInputAmount: number;
+  inputDecimals: number;
+  /** USD value of remaining input, if known */
+  valueUsd: number | null;
+  status: string;
+  extra?: Record<string, unknown>;
+}
+
+export async function getOpenOrders(walletAddress: string): Promise<OpenOrderPosition[]> {
+  const positions: OpenOrderPosition[] = [];
+
+  // Fetch DCA and limit orders in parallel
+  const [dcaOrders, limitOrders] = await Promise.all([
+    listDcaOrders(walletAddress, { status: 'active' }).catch((err) => {
+      verbose(`Could not fetch DCA orders: ${err}`);
+      return [] as DcaOrder[];
+    }),
+    listLimitOrders(walletAddress, { status: 'active' }).catch((err) => {
+      verbose(`Could not fetch limit orders: ${err}`);
+      return [] as LimitOrder[];
+    }),
+  ]);
+
+  // Collect mints for price lookup
+  const mints = new Set<string>();
+  for (const o of dcaOrders) mints.add(o.inputMint);
+  for (const o of limitOrders) mints.add(o.inputMint);
+
+  let prices = new Map<string, { priceUsd: number }>();
+  if (mints.size > 0) {
+    try {
+      prices = await getPrices([...mints]);
+    } catch { /* non-critical */ }
+  }
+
+  // Resolve symbols and decimals
+  const tokenCache = new Map<string, { symbol: string; decimals: number }>();
+  async function getTokenInfo(mint: string): Promise<{ symbol: string; decimals: number } | undefined> {
+    if (tokenCache.has(mint)) return tokenCache.get(mint)!;
+    try {
+      const t = await resolveToken(mint);
+      if (t) {
+        tokenCache.set(mint, { symbol: t.symbol, decimals: t.decimals });
+        return { symbol: t.symbol, decimals: t.decimals };
+      }
+    } catch { /* non-critical */ }
+    return undefined;
+  }
+
+  // DCA orders — remaining = deposited - used
+  // API returns UI-formatted amounts (already divided by decimals)
+  for (const o of dcaOrders) {
+    const inputInfo = await getTokenInfo(o.inputMint);
+    const outputInfo = await getTokenInfo(o.outputMint);
+    const deposited = Number(o.inDeposited || '0');
+    const used = Number(o.inUsed || '0');
+    const remainingUi = Math.max(0, deposited - used);
+    const price = prices.get(o.inputMint);
+
+    positions.push({
+      type: 'dca',
+      orderKey: o.orderKey,
+      inputMint: o.inputMint,
+      outputMint: o.outputMint,
+      inputSymbol: inputInfo?.symbol || o.inputSymbol,
+      outputSymbol: outputInfo?.symbol || o.outputSymbol,
+      remainingInputAmount: remainingUi,
+      inputDecimals: inputInfo?.decimals ?? 6,
+      valueUsd: price ? remainingUi * price.priceUsd : null,
+      status: o.status,
+      extra: {
+        interval: o.cycleFrequency,
+        deposited,
+        used,
+        received: o.outReceived,
+      },
+    });
+  }
+
+  // Limit orders — remaining = remainingMakingAmount
+  // API returns UI-formatted amounts (already divided by decimals)
+  for (const o of limitOrders) {
+    const inputInfo = await getTokenInfo(o.inputMint);
+    const outputInfo = await getTokenInfo(o.outputMint);
+    const remainingUi = Number(o.remainingMakingAmount || o.makingAmount || '0');
+    const price = prices.get(o.inputMint);
+
+    positions.push({
+      type: 'limit',
+      orderKey: o.orderKey,
+      inputMint: o.inputMint,
+      outputMint: o.outputMint,
+      inputSymbol: inputInfo?.symbol || o.inputSymbol,
+      outputSymbol: outputInfo?.symbol || o.outputSymbol,
+      remainingInputAmount: remainingUi,
+      inputDecimals: inputInfo?.decimals ?? 6,
+      valueUsd: price ? remainingUi * price.priceUsd : null,
+      status: o.status,
+      extra: {
+        takingAmount: o.takingAmount,
+        createdAt: o.createdAt,
+      },
+    });
+  }
+
+  return positions;
+}
+
 export async function cancelLimitOrder(
   orderKey: string,
   walletName: string,
