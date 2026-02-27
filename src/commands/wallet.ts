@@ -408,5 +408,6 @@ function formatTxDetail(tx: txRepo.TransactionRow): string {
     return `${fromAmt} ${fromSym}`;
   }
   if (fromAmt && fromSym) return `${fromAmt} ${fromSym}`;
+  if (toAmt && toSym && toAmt !== '0.000000') return `${toAmt} ${toSym}`;
   return '—';
 }

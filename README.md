@@ -211,6 +211,22 @@ sol predict history                          # Transaction history
 
 Markets are sourced from Polymarket and Kalshi via Jupiter's prediction market API. Categories include crypto, sports, politics, culture, economics, tech, finance, and more. Positions appear in `sol portfolio` with unrealized P&L, and claimable winnings are highlighted.
 
+### fetch — Pay-per-request APIs with x402
+
+```bash
+sol fetch https://api.example.com/data          # Auto-pays if server returns 402
+sol fetch https://api.example.com/data --dry-run # Show price without paying
+sol fetch https://api.example.com/data --max 0.05  # Spending cap in USDC
+
+sol fetch https://api.example.com/rpc \
+  -X POST -d '{"query":"..."}' \
+  -H "Accept: application/json"                 # POST with headers, like curl
+```
+
+Works like `curl` but handles [x402](https://x402.org) payment flows automatically. If the server returns `402 Payment Required`, the CLI signs a USDC transfer, attaches it to the retry, and prints the response body to stdout. Payment info goes to stderr so piped output stays clean.
+
+Supports both x402 v1 (`X-PAYMENT`) and v2 (`PAYMENT-SIGNATURE`) protocols. The server provides the fee payer and submits the transaction — your wallet only partially signs.
+
 ### config — Persistent settings
 
 ```bash
@@ -337,6 +353,7 @@ canCreateWallet = false
 canRemoveWallet = false
 canExportWallet = false
 canPredict = false
+canPay = false
 ```
 
 | Permission | Gated subcommands |
@@ -349,6 +366,7 @@ canPredict = false
 | `canWithdrawLend` | `lend withdraw` |
 | `canBorrow` | `lend borrow`, `lend repay` |
 | `canPredict` | `predict buy`, `predict sell`, `predict claim` |
+| `canPay` | `fetch` (x402 payments) |
 | `canBurn` | `token burn`, `token close --burn` (runtime) |
 | `canCreateWallet` | `wallet create`, `wallet import` |
 | `canRemoveWallet` | `wallet remove` |

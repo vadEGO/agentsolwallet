@@ -4,6 +4,7 @@ import { getStakeAccounts, type StakeAccountInfo } from './stake-service.js';
 import { getPositions as getLendPositions, type LendingPosition } from './lend-service.js';
 import { getOpenOrders, type OpenOrderPosition } from './order-service.js';
 import { getPositions as getPredictPositions, type PredictionPosition } from './predict-service.js';
+import { getEarnPositions, type EarnPosition } from './earn-service.js';
 import { getPrices, type PriceResult } from './price-service.js';
 import * as snapshotRepo from '../db/repos/snapshot-repo.js';
 import { verbose } from '../output/formatter.js';
@@ -12,7 +13,7 @@ import { SOL_MINT } from '../utils/solana.js';
 // ── Types ─────────────────────────────────────────────────
 
 export interface PortfolioPosition {
-  type: 'token' | 'stake' | 'lend' | 'lp' | 'order' | 'predict';
+  type: 'token' | 'stake' | 'lend' | 'lp' | 'order' | 'predict' | 'earn';
   protocol?: string;
   wallet: string;
   mint: string;
@@ -70,7 +71,7 @@ export async function getPortfolio(walletFilter?: string): Promise<PortfolioRepo
 
   // Fetch token balances, stake accounts, lending positions, and open orders in parallel per wallet
   const walletData = await Promise.all(wallets.map(async (w) => {
-    const [tokens, stakes, lends, orders, predictions] = await Promise.all([
+    const [tokens, stakes, lends, orders, predictions, earns] = await Promise.all([
       getTokenBalances(w.address),
       getStakeAccounts(w.address),
       getLendPositions(w.address).catch((err) => {
@@ -85,16 +86,21 @@ export async function getPortfolio(walletFilter?: string): Promise<PortfolioRepo
         verbose(`Could not fetch prediction positions: ${err}`);
         return [] as PredictionPosition[];
       }),
+      getEarnPositions(w.address).catch((err) => {
+        verbose(`Could not fetch earn positions: ${err}`);
+        return [] as EarnPosition[];
+      }),
     ]);
-    return { wallet: w, tokens, stakes, lends, orders, predictions };
+    return { wallet: w, tokens, stakes, lends, orders, predictions, earns };
   }));
 
   // Collect all mints for batch price fetch
   const allMints = new Set<string>();
-  for (const { tokens, lends, orders } of walletData) {
+  for (const { tokens, lends, orders, earns } of walletData) {
     for (const t of tokens) allMints.add(t.mint);
     for (const l of lends) allMints.add(l.mint);
     for (const o of orders) allMints.add(o.inputMint);
+    for (const e of earns) allMints.add(e.mint);
   }
   allMints.add(SOL_MINT); // Stake positions need SOL price
 
@@ -104,7 +110,7 @@ export async function getPortfolio(walletFilter?: string): Promise<PortfolioRepo
   const positions: PortfolioPosition[] = [];
   let claimableMev = 0;
 
-  for (const { wallet, tokens, stakes, lends, orders, predictions } of walletData) {
+  for (const { wallet, tokens, stakes, lends, orders, predictions, earns } of walletData) {
     // Token positions
     for (const t of tokens) {
       const price = prices.get(t.mint);
@@ -199,6 +205,27 @@ export async function getPortfolio(walletFilter?: string): Promise<PortfolioRepo
           costBasis: pred.costBasisUsd,
           unrealizedPnl: pred.unrealizedPnlUsd,
           claimable: pred.claimable,
+        },
+      });
+    }
+
+    // Earn positions
+    for (const e of earns) {
+      const price = prices.get(e.mint)?.priceUsd;
+      const valueUsd = e.valueUsd ?? (price ? e.depositedAmount * price : null);
+      positions.push({
+        type: 'earn',
+        protocol: e.protocol,
+        wallet: wallet.name,
+        mint: e.mint,
+        symbol: e.token,
+        amount: e.depositedAmount,
+        valueUsd,
+        extra: {
+          vaultId: e.vaultId,
+          vaultName: e.vaultName,
+          apy: e.apy,
+          shares: e.shares,
         },
       });
     }

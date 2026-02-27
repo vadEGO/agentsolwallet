@@ -151,6 +151,30 @@ export function renderPortfolio(report: PortfolioReport): string {
     }, footnotes.length > 0 ? footnotes.join('\n') : undefined));
   }
 
+  // ── Earn ──
+  const earnPositions = report.positions.filter(p => p.type === 'earn');
+  if (earnPositions.length > 0) {
+    const earnTotal = earnPositions.reduce((s, p) => s + (p.valueUsd ?? 0), 0);
+    sections.push(buildTableSection('Earn', {
+      rows: earnPositions.map(p => ({
+        protocol: p.protocol ?? '',
+        vault: String(p.extra?.vaultName ?? ''),
+        token: p.symbol,
+        amount: fmtAmount(p.amount),
+        value: p.valueUsd != null ? `$${fmt(p.valueUsd)}` : '\u2014',
+        apy: p.extra?.apy != null ? `${((p.extra.apy as number) * 100).toFixed(2)}%` : '\u2014',
+      })),
+      columns: [
+        { key: 'protocol', header: 'Protocol' },
+        { key: 'vault', header: 'Vault' },
+        { key: 'token', header: 'Token' },
+        { key: 'amount', header: 'Amount', align: 'right' },
+        { key: 'value', header: 'Value', align: 'right' },
+        { key: 'apy', header: 'APY', align: 'right' },
+      ],
+    }, `  Total: $${fmt(earnTotal)}`));
+  }
+
   // ── Open Orders ──
   const orderPositions = report.positions.filter(p => p.type === 'order');
   if (orderPositions.length > 0) {

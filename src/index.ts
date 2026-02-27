@@ -6,10 +6,12 @@ import { registerWalletCommand } from './commands/wallet.js';
 import { registerTokenCommand } from './commands/token.js';
 import { registerStakeCommand } from './commands/stake.js';
 import { registerLendCommand } from './commands/lend.js';
+import { registerEarnCommand } from './commands/earn.js';
 import { registerPortfolioCommand } from './commands/portfolio.js';
 import { registerTxCommand } from './commands/tx.js';
 import { registerNetworkCommand } from './commands/network.js';
 import { registerPredictCommand } from './commands/predict.js';
+import { registerFetchCommand } from './commands/fetch.js';
 import { closeDb } from './db/database.js';
 
 const program = new Command();
@@ -34,10 +36,12 @@ registerWalletCommand(program);
 registerTokenCommand(program);
 registerStakeCommand(program);
 registerLendCommand(program);
+registerEarnCommand(program);
 registerPortfolioCommand(program);
 registerTxCommand(program);
 registerNetworkCommand(program);
 registerPredictCommand(program);
+registerFetchCommand(program);
 
 // Custom help: show subcommands grouped under each parent
 program.configureHelp({

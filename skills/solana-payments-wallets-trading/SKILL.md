@@ -3,10 +3,10 @@ name: solana-payments-wallets-trading
 description: >-
   Pay people in SOL or USDC, buy and sell tokens, check prices, manage Solana
   wallets, stake SOL, earn yield through lending, trade prediction markets,
-  and track portfolio performance — all from the command line. No API keys,
-  no private key env vars. Use when the user wants to send crypto, trade,
-  check balances, earn yield, bet on predictions, or see how their holdings
-  are doing.
+  pay for APIs via x402, and track portfolio performance — all from the
+  command line. No API keys, no private key env vars. Use when the user wants
+  to send crypto, trade, check balances, earn yield, bet on predictions,
+  pay for web resources, or see how their holdings are doing.
 license: MIT
 metadata:
   author: solanaguide
@@ -215,6 +215,29 @@ Positions appear in `sol portfolio` with unrealized P&L.
 
 See references/prediction-commands.md for the full reference.
 
+## Pay for APIs with x402
+
+Fetch URLs that require payment via the x402 protocol. Works like
+`curl` — stdout is the response body, payment info goes to stderr.
+
+```bash
+sol fetch https://api.example.com/data             # auto-pays 402 responses
+sol fetch https://api.example.com/data --dry-run   # show price without paying
+sol fetch https://api.example.com/data --max 0.05  # spending cap in USDC
+
+sol fetch https://api.example.com/rpc \
+  -X POST -d '{"query":"..."}' \
+  -H "Accept: application/json"                    # POST with headers
+```
+
+If the server returns 402 Payment Required, the CLI signs a USDC
+transfer and retries with the payment attached. The server submits
+the transaction — your wallet only partially signs.
+
+Use `--dry-run` to inspect the cost before paying. Use `--max` to
+set a spending cap. Output is pipe-friendly by default; use `--json`
+for the structured envelope.
+
 ## Track How Your Portfolio Is Doing
 
 See everything in one place — tokens, staked SOL, lending positions,
@@ -300,6 +323,7 @@ canBurn = false
 canCreateWallet = false
 canRemoveWallet = false
 canExportWallet = false
+canPay = false
 ```
 
 | Permission | Gated subcommands |
@@ -315,6 +339,7 @@ canExportWallet = false
 | `canCreateWallet` | `wallet create`, `wallet import` |
 | `canRemoveWallet` | `wallet remove` |
 | `canExportWallet` | `wallet export` |
+| `canPay` | `fetch` (x402 payments) |
 
 Read-only commands (`token browse/price/info/list`, `wallet list/balance`, `stake list`, `lend rates/positions`, `portfolio`, `network`, `tx`) are always available regardless of permissions.
 
