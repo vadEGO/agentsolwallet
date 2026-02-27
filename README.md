@@ -331,6 +331,7 @@ canStake = false
 canWithdrawStake = false
 canLend = false
 canWithdrawLend = false
+canBorrow = false
 canBurn = false
 canCreateWallet = false
 canRemoveWallet = false
@@ -344,8 +345,9 @@ canPredict = false
 | `canSwap` | `token swap`, `token close --all` (runtime) |
 | `canStake` | `stake new` |
 | `canWithdrawStake` | `stake withdraw`, `stake claim-mev` |
-| `canLend` | `lend deposit`, `lend borrow` |
-| `canWithdrawLend` | `lend withdraw`, `lend repay` |
+| `canLend` | `lend deposit` |
+| `canWithdrawLend` | `lend withdraw` |
+| `canBorrow` | `lend borrow`, `lend repay` |
 | `canPredict` | `predict buy`, `predict sell`, `predict claim` |
 | `canBurn` | `token burn`, `token close --burn` (runtime) |
 | `canCreateWallet` | `wallet create`, `wallet import` |

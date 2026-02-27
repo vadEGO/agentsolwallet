@@ -252,7 +252,7 @@ export function registerLendCommand(program: Command): void {
 
   // ── borrow ──────────────────────────────────────────────
 
-  if (isPermitted('canLend')) lend
+  if (isPermitted('canBorrow')) lend
     .command('borrow <amount> <token>')
     .description('Borrow against collateral (Kamino, MarginFi, Drift, Loopscale)')
     .option('--collateral <token>', 'Collateral token (required)')
@@ -290,7 +290,7 @@ export function registerLendCommand(program: Command): void {
 
   // ── repay ───────────────────────────────────────────────
 
-  if (isPermitted('canWithdrawLend')) lend
+  if (isPermitted('canBorrow')) lend
     .command('repay <amount> <token>')
     .description('Repay a loan (use "max" to repay full debt)')
     .option('--wallet <name>', 'Wallet to use')

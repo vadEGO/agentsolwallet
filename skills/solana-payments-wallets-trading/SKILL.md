@@ -291,6 +291,7 @@ canStake = false
 canWithdrawStake = false
 canLend = false
 canWithdrawLend = false
+canBorrow = false
 canBurn = false
 canCreateWallet = false
 canRemoveWallet = false
@@ -303,8 +304,9 @@ canExportWallet = false
 | `canSwap` | `token swap`, `token close --all`, `token dca new/cancel`, `token limit new/cancel` |
 | `canStake` | `stake new` |
 | `canWithdrawStake` | `stake withdraw`, `stake claim-mev` |
-| `canLend` | `lend deposit`, `lend borrow` |
-| `canWithdrawLend` | `lend withdraw`, `lend repay` |
+| `canLend` | `lend deposit` |
+| `canWithdrawLend` | `lend withdraw` |
+| `canBorrow` | `lend borrow`, `lend repay` |
 | `canBurn` | `token burn`, `token close --burn` |
 | `canCreateWallet` | `wallet create`, `wallet import` |
 | `canRemoveWallet` | `wallet remove` |

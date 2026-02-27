@@ -10,6 +10,7 @@ export interface Permissions {
   canWithdrawStake?: boolean;
   canLend?: boolean;
   canWithdrawLend?: boolean;
+  canBorrow?: boolean;
   canBurn?: boolean;
   canCreateWallet?: boolean;
   canRemoveWallet?: boolean;
