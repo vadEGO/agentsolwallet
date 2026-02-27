@@ -19,7 +19,6 @@ import { getRpc } from './rpc.js';
 import { loadSigner, getDefaultWalletName, resolveWalletName } from './wallet-manager.js';
 import { logTransaction } from './transaction.js';
 import { verbose } from '../output/formatter.js';
-import { randomBytes } from 'node:crypto';
 
 const USDC_MINT = address('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
 const USDC_DECIMALS = 6;
@@ -157,12 +156,13 @@ export async function x402Fetch(url: string, opts: X402FetchOptions = {}): Promi
       resource: { url },
     };
   } else {
-    // v1: X-PAYMENT header, flat scheme/network at top level
+    // v1: X-PAYMENT header, flat scheme/network/asset at top level
     headerName = 'X-PAYMENT';
     paymentPayload = {
       x402Version: 1,
       scheme: requirements.scheme,
       network: requirements.network,
+      asset: requirements.asset,
       payload: { transaction: paymentBase64 },
     };
   }
@@ -275,13 +275,13 @@ async function buildPaymentTransaction(
   // SetComputeUnitLimit: discriminator(1) + u32 units(4)
   const limitData = new Uint8Array(5);
   limitData[0] = 2;
-  new DataView(limitData.buffer).setUint32(1, 100_000, true);
+  new DataView(limitData.buffer).setUint32(1, 50_000, true);
   instructions.push({ programAddress: computeBudgetProgram, accounts: [], data: limitData });
 
   // SetComputeUnitPrice: discriminator(1) + u64 microLamports(8)
   const priceData = new Uint8Array(9);
   priceData[0] = 3;
-  new DataView(priceData.buffer).setBigUint64(1, BigInt(50_000), true);
+  new DataView(priceData.buffer).setBigUint64(1, BigInt(1), true);
   instructions.push({ programAddress: computeBudgetProgram, accounts: [], data: priceData });
 
   // Transfer USDC (TransferChecked)
@@ -295,15 +295,6 @@ async function buildPaymentTransaction(
       decimals,
     }),
   );
-
-  // Memo with random nonce for tx uniqueness (matches x402 reference impl)
-  const memoProgramId = address('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr');
-  const nonce = randomBytes(16).toString('hex');
-  instructions.push({
-    programAddress: memoProgramId,
-    accounts: [],
-    data: new TextEncoder().encode(nonce),
-  });
 
   // Build and partially sign — server co-signs as fee payer before submitting
   const message = pipe(
