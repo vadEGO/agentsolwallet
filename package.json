@@ -3,6 +3,7 @@
   "version": "0.2.4",
   "description": "Solana CLI for Humans and LLM Agents",
   "type": "module",
+  "workspaces": ["sdk"],
   "bin": {
     "sol": "./bin/sol.mjs"
   },
@@ -13,6 +14,7 @@
     "test": "node --import tsx --test tests/**/*.test.ts"
   },
   "dependencies": {
+    "@solana-compass/sdk": "workspace:*",
     "@coral-xyz/anchor": "^0.32.1",
     "@drift-labs/sdk": "^2.155.0",
     "@kamino-finance/klend-sdk": "^7.3.19",

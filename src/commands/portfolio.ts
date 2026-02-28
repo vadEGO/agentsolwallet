@@ -1,10 +1,22 @@
 import { Command } from 'commander';
-import { getDefaultWalletName, resolveWalletName } from '../core/wallet-manager.js';
-import * as portfolioService from '../core/portfolio-service.js';
+import { getDefaultWalletName, resolveWalletName, listWallets } from '../core/wallet-manager.js';
+import { ensureProviders } from '../sdk-init.js';
 import * as snapshotRepo from '../db/repos/snapshot-repo.js';
 import { renderPortfolio, renderCompare } from '../output/portfolio-renderer.js';
 import { output, success, failure, isJsonMode, timed } from '../output/formatter.js';
 import { table } from '../output/table.js';
+
+/** Resolve wallet filter to {name, address}[] for SDK portfolio methods. */
+function resolveWallets(walletFilter?: string): { name: string; address: string }[] {
+  if (walletFilter) {
+    const name = resolveWalletName(walletFilter);
+    const all = listWallets();
+    const w = all.find(w => w.name === name);
+    if (!w) throw new Error(`Wallet "${name}" not found`);
+    return [{ name: w.name, address: w.address }];
+  }
+  return listWallets().map(w => ({ name: w.name, address: w.address }));
+}
 
 export function registerPortfolioCommand(program: Command): void {
   const portfolio = program
@@ -14,12 +26,14 @@ export function registerPortfolioCommand(program: Command): void {
     .action(async (_opts, cmd) => {
       const opts = cmd.optsWithGlobals();
       try {
+        const sdk = await ensureProviders();
+        const wallets = resolveWallets(opts.wallet);
         const { result: report, elapsed_ms } = await timed(() =>
-          portfolioService.getPortfolio(opts.wallet ? resolveWalletName(opts.wallet) : undefined)
+          sdk.portfolio.get(wallets)
         );
 
         // Auto-snapshot on every view (rate-limited, fire-and-forget)
-        portfolioService.autoSnapshot(report).catch(() => {});
+        sdk.portfolio.autoSnapshot(report).catch(() => {});
 
         if (isJsonMode()) {
           output(success(report, { elapsed_ms }));
@@ -42,8 +56,10 @@ export function registerPortfolioCommand(program: Command): void {
     .action(async (opts, cmd) => {
       const globalOpts = cmd.optsWithGlobals();
       try {
+        const sdk = await ensureProviders();
+        const wallets = resolveWallets(globalOpts.wallet);
         const { result: data, elapsed_ms } = await timed(() =>
-          portfolioService.takeSnapshot(opts.label, globalOpts.wallet)
+          sdk.portfolio.takeSnapshot(wallets, opts.label)
         );
 
         if (isJsonMode()) {
@@ -104,9 +120,11 @@ export function registerPortfolioCommand(program: Command): void {
     .action(async (idStr?: string, opts?: any, cmd?: any) => {
       const globalOpts = (cmd ?? opts)?.optsWithGlobals?.() ?? {};
       try {
+        const sdk = await ensureProviders();
+        const wallets = resolveWallets(globalOpts.wallet);
         const { result: data, elapsed_ms } = await timed(async () => {
           const id = idStr ? parseInt(idStr) : undefined;
-          return portfolioService.compareToSnapshot(id, globalOpts.wallet);
+          return sdk.portfolio.compareToSnapshot(wallets, id);
         });
 
         const snapLabel = data.snapshotDate
@@ -134,9 +152,11 @@ export function registerPortfolioCommand(program: Command): void {
     .action(async (opts, cmd) => {
       const globalOpts = cmd.optsWithGlobals();
       try {
+        const sdk = await ensureProviders();
+        const wallets = resolveWallets(globalOpts.wallet);
         const { result: data, elapsed_ms } = await timed(() => {
           const sinceId = opts.since ? parseInt(opts.since) : undefined;
-          return portfolioService.getPnl(sinceId, globalOpts.wallet);
+          return sdk.portfolio.getPnl(wallets, sinceId);
         });
 
         const snapLabel = data.snapshotDate

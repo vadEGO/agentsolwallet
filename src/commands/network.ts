@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { getRpc } from '../core/rpc.js';
-import { SOLANA_COMPASS_VOTE } from '../core/stake-service.js';
+import { SOLANA_COMPASS_VOTE } from '@solana-compass/sdk';
 import { output, success, failure, isJsonMode, timed, verbose } from '../output/formatter.js';
 import { withRetry, isRetryableHttpError } from '../utils/retry.js';
 

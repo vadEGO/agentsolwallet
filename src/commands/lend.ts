@@ -1,11 +1,11 @@
 import { Command } from 'commander';
-import * as lendService from '../core/lend-service.js';
+import { ensureProviders } from '../sdk-init.js';
+import { PROTOCOL_NAMES } from '@solana-compass/sdk';
 import { getDefaultWalletName, resolveWalletName } from '../core/wallet-manager.js';
 import { isPermitted } from '../core/config-manager.js';
 import { output, success, failure, isJsonMode, timed } from '../output/formatter.js';
 import { table } from '../output/table.js';
 import * as walletRepo from '../db/repos/wallet-repo.js';
-import { PROTOCOL_NAMES } from '../core/lend/lend-provider.js';
 
 export function registerLendCommand(program: Command): void {
   const lend = program.command('lend').description('Lending and borrowing (Kamino, MarginFi, Drift, Jupiter, Loopscale)');
@@ -21,9 +21,10 @@ export function registerLendCommand(program: Command): void {
     .option(protocolOption, protocolDesc)
     .action(async (tokens: string[], opts) => {
       try {
+        const sdk = await ensureProviders();
         const filterTokens = tokens.length > 0 ? tokens : undefined;
         const { result, elapsed_ms } = await timed(() =>
-          lendService.getRates(filterTokens, opts.protocol)
+          sdk.lend.getRates(filterTokens, opts.protocol)
         );
 
         if (isJsonMode()) {
@@ -96,12 +97,13 @@ export function registerLendCommand(program: Command): void {
     .option(protocolOption, protocolDesc)
     .action(async (opts) => {
       try {
+        const sdk = await ensureProviders();
         const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
         const wallet = walletRepo.getWallet(walletName);
         if (!wallet) throw new Error(`Wallet "${walletName}" not found`);
 
         const { result: positions, elapsed_ms } = await timed(() =>
-          lendService.getPositions(wallet.address, opts.protocol)
+          sdk.lend.getPositions(wallet.address, opts.protocol)
         );
 
         if (isJsonMode()) {
@@ -202,9 +204,10 @@ export function registerLendCommand(program: Command): void {
         const amount = parseFloat(amountStr);
         if (isNaN(amount) || amount <= 0) throw new Error('Invalid amount');
 
+        const sdk = await ensureProviders();
         const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
         const { result, elapsed_ms } = await timed(() =>
-          lendService.deposit(walletName, token, amount, opts.protocol)
+          sdk.lend.deposit(walletName, token, amount, opts.protocol)
         );
 
         if (isJsonMode()) {
@@ -231,9 +234,10 @@ export function registerLendCommand(program: Command): void {
       try {
         const amount = parseMaxAmount(amountStr);
 
+        const sdk = await ensureProviders();
         const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
         const { result, elapsed_ms } = await timed(() =>
-          lendService.withdraw(walletName, token, amount, opts.protocol)
+          sdk.lend.withdraw(walletName, token, amount, opts.protocol)
         );
 
         if (isJsonMode()) {
@@ -264,9 +268,10 @@ export function registerLendCommand(program: Command): void {
         if (isNaN(amount) || amount <= 0) throw new Error('Invalid amount');
         if (!opts.collateral) throw new Error('--collateral is required');
 
+        const sdk = await ensureProviders();
         const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
         const { result, elapsed_ms } = await timed(() =>
-          lendService.borrow(walletName, token, amount, opts.collateral, opts.protocol)
+          sdk.lend.borrow(walletName, token, amount, opts.collateral, opts.protocol)
         );
 
         if (isJsonMode()) {
@@ -299,9 +304,10 @@ export function registerLendCommand(program: Command): void {
       try {
         const amount = parseMaxAmount(amountStr);
 
+        const sdk = await ensureProviders();
         const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
         const { result, elapsed_ms } = await timed(() =>
-          lendService.repay(walletName, token, amount, opts.protocol)
+          sdk.lend.repay(walletName, token, amount, opts.protocol)
         );
 
         if (isJsonMode()) {

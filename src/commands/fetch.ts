@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { x402Fetch } from '../core/x402-service.js';
+import { getSdk } from '../sdk-init.js';
 import { isPermitted } from '../core/config-manager.js';
 import { output, success, failure, isJsonMode, timed } from '../output/formatter.js';
 import { explorerUrl } from '../utils/solana.js';
@@ -19,7 +19,7 @@ export function registerFetchCommand(program: Command): void {
     .action(async (url: string, opts) => {
       try {
         const { result, elapsed_ms } = await timed(() =>
-          x402Fetch(url, {
+          getSdk().x402.fetch(url, {
             method: opts.method,
             body: opts.body,
             headers: opts.header,

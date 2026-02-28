@@ -1,11 +1,11 @@
 import { Command } from 'commander';
-import * as earnService from '../core/earn-service.js';
+import { ensureProviders } from '../sdk-init.js';
+import { EARN_PROTOCOL_NAMES } from '@solana-compass/sdk';
 import { getDefaultWalletName, resolveWalletName } from '../core/wallet-manager.js';
 import { isPermitted } from '../core/config-manager.js';
 import { output, success, failure, isJsonMode, timed } from '../output/formatter.js';
 import { table } from '../output/table.js';
 import * as walletRepo from '../db/repos/wallet-repo.js';
-import { EARN_PROTOCOL_NAMES } from '../core/earn/earn-provider.js';
 
 export function registerEarnCommand(program: Command): void {
   const earn = program.command('earn').description('Managed yield vaults (Kamino Earn, Loopscale)');
@@ -22,10 +22,11 @@ export function registerEarnCommand(program: Command): void {
     .option('--sort <field>', 'Sort by: apy (default), tvl', 'apy')
     .action(async (tokens: string[], opts) => {
       try {
+        const sdk = await ensureProviders();
         const filterTokens = tokens.length > 0 ? tokens : undefined;
         const sort = opts.sort === 'tvl' ? 'tvl' : 'apy' as const;
         const { result, elapsed_ms } = await timed(() =>
-          earnService.getEarnVaults(filterTokens, opts.protocol, sort)
+          sdk.earn.getVaults(filterTokens, opts.protocol, sort)
         );
 
         if (isJsonMode()) {
@@ -90,12 +91,13 @@ export function registerEarnCommand(program: Command): void {
     .option(protocolOption, protocolDesc)
     .action(async (opts) => {
       try {
+        const sdk = await ensureProviders();
         const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
         const wallet = walletRepo.getWallet(walletName);
         if (!wallet) throw new Error(`Wallet "${walletName}" not found`);
 
         const { result: positions, elapsed_ms } = await timed(() =>
-          earnService.getEarnPositions(wallet.address, opts.protocol)
+          sdk.earn.getPositions(wallet.address, opts.protocol)
         );
 
         if (isJsonMode()) {
@@ -148,9 +150,10 @@ export function registerEarnCommand(program: Command): void {
         const amount = parseFloat(amountStr);
         if (isNaN(amount) || amount <= 0) throw new Error('Invalid amount');
 
+        const sdk = await ensureProviders();
         const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
         const { result, elapsed_ms } = await timed(() =>
-          earnService.earnDeposit(walletName, token, amount, opts.protocol, opts.vault)
+          sdk.earn.deposit(walletName, token, amount, opts.protocol, opts.vault)
         );
 
         if (isJsonMode()) {
@@ -177,9 +180,10 @@ export function registerEarnCommand(program: Command): void {
       try {
         const amount = parseMaxAmount(amountStr);
 
+        const sdk = await ensureProviders();
         const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
         const { result, elapsed_ms } = await timed(() =>
-          earnService.earnWithdraw(walletName, token, amount, opts.protocol)
+          sdk.earn.withdraw(walletName, token, amount, opts.protocol)
         );
 
         if (isJsonMode()) {

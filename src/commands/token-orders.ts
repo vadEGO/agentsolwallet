@@ -1,15 +1,7 @@
 import { type Command } from 'commander';
-import {
-  createDcaOrder,
-  listDcaOrders,
-  cancelDcaOrder,
-  createLimitOrder,
-  listLimitOrders,
-  cancelLimitOrder,
-  parseInterval,
-} from '../core/order-service.js';
+import { getSdk } from '../sdk-init.js';
+import { parseInterval } from '@solana-compass/sdk';
 import { getDefaultWalletName, resolveWalletName } from '../core/wallet-manager.js';
-import { resolveToken } from '../core/token-registry.js';
 import { output, success, failure, isJsonMode, timed, fmtPrice } from '../output/formatter.js';
 import { table } from '../output/table.js';
 import { isPermitted } from '../core/config-manager.js';
@@ -60,7 +52,7 @@ export function registerOrderCommands(token: Command): void {
         }
 
         const { result, elapsed_ms } = await timed(() =>
-          createDcaOrder(amount, from, to, walletName, {
+          getSdk().order.createDca(amount, from, to, walletName, {
             interval: opts.every,
             count: opts.count,
           })
@@ -93,17 +85,18 @@ export function registerOrderCommands(token: Command): void {
         const wallet = walletRepo.getWallet(walletName);
         if (!wallet) throw new Error(`Wallet "${walletName}" not found`);
 
+        const sdk = getSdk();
         const { result: orders, elapsed_ms } = await timed(() =>
-          listDcaOrders(wallet.address, { status: opts.history ? 'history' : 'active' })
+          sdk.order.listDca(wallet.address, { status: opts.history ? 'history' : 'active' })
         );
 
         // Try to resolve token symbols
         for (const order of orders) {
           try {
-            const input = await resolveToken(order.inputMint);
-            const output = await resolveToken(order.outputMint);
+            const input = await sdk.registry.resolveToken(order.inputMint);
+            const outTok = await sdk.registry.resolveToken(order.outputMint);
             if (input) order.inputSymbol = input.symbol;
-            if (output) order.outputSymbol = output.symbol;
+            if (outTok) order.outputSymbol = outTok.symbol;
           } catch { /* non-critical */ }
         }
 
@@ -153,7 +146,7 @@ export function registerOrderCommands(token: Command): void {
         const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
 
         const { result: signature, elapsed_ms } = await timed(() =>
-          cancelDcaOrder(orderKey, walletName)
+          getSdk().order.cancelDca(orderKey, walletName)
         );
 
         if (isJsonMode()) {
@@ -189,17 +182,17 @@ export function registerOrderCommands(token: Command): void {
 
         if (opts.quoteOnly) {
           // Estimate output for display
-          const inputToken = await resolveToken(from);
+          const sdk = getSdk();
+          const inputToken = await sdk.registry.resolveToken(from);
           if (!inputToken) throw new Error(`Unknown token: ${from}`);
-          const outputToken = await resolveToken(to);
+          const outputToken = await sdk.registry.resolveToken(to);
           if (!outputToken) throw new Error(`Unknown token: ${to}`);
 
           // Try to get current input price
           let currentInputPrice: number | undefined;
           let currentOutputPrice: number | undefined;
           try {
-            const { getPrices } = await import('../core/price-service.js');
-            const prices = await getPrices([inputToken.mint, outputToken.mint]);
+            const prices = await sdk.price.getPrices([inputToken.mint, outputToken.mint]);
             currentInputPrice = prices.get(inputToken.mint)?.priceUsd;
             currentOutputPrice = prices.get(outputToken.mint)?.priceUsd;
           } catch { /* ok */ }
@@ -237,7 +230,7 @@ export function registerOrderCommands(token: Command): void {
 
         const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
         const { result, elapsed_ms } = await timed(() =>
-          createLimitOrder(amount, from, to, walletName, {
+          getSdk().order.createLimit(amount, from, to, walletName, {
             targetPrice: opts.at,
             slippageBps: opts.slippage,
           })
@@ -270,15 +263,16 @@ export function registerOrderCommands(token: Command): void {
         const wallet = walletRepo.getWallet(walletName);
         if (!wallet) throw new Error(`Wallet "${walletName}" not found`);
 
+        const sdk = getSdk();
         const { result: orders, elapsed_ms } = await timed(() =>
-          listLimitOrders(wallet.address, { status: opts.history ? 'history' : 'active' })
+          sdk.order.listLimit(wallet.address, { status: opts.history ? 'history' : 'active' })
         );
 
         // Try to resolve token symbols
         for (const order of orders) {
           try {
-            const input = await resolveToken(order.inputMint);
-            const outputTok = await resolveToken(order.outputMint);
+            const input = await sdk.registry.resolveToken(order.inputMint);
+            const outputTok = await sdk.registry.resolveToken(order.outputMint);
             if (input) order.inputSymbol = input.symbol;
             if (outputTok) order.outputSymbol = outputTok.symbol;
           } catch { /* non-critical */ }
@@ -329,7 +323,7 @@ export function registerOrderCommands(token: Command): void {
         const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
 
         const { result: signature, elapsed_ms } = await timed(() =>
-          cancelLimitOrder(orderKey, walletName)
+          getSdk().order.cancelLimit(orderKey, walletName)
         );
 
         if (isJsonMode()) {

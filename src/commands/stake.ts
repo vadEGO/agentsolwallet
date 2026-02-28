@@ -1,11 +1,6 @@
 import { Command } from 'commander';
-import {
-  getStakeAccounts,
-  createAndDelegateStake,
-  withdrawStake,
-  claimMev,
-  SOLANA_COMPASS_VOTE,
-} from '../core/stake-service.js';
+import { getSdk } from '../sdk-init.js';
+import { SOLANA_COMPASS_VOTE } from '@solana-compass/sdk';
 import { getDefaultWalletName, resolveWalletName } from '../core/wallet-manager.js';
 import { isPermitted } from '../core/config-manager.js';
 import { output, success, failure, isJsonMode, timed } from '../output/formatter.js';
@@ -26,7 +21,7 @@ export function registerStakeCommand(program: Command): void {
         const wallet = walletRepo.getWallet(walletName);
         if (!wallet) throw new Error(`Wallet "${walletName}" not found`);
 
-        const { result: accounts, elapsed_ms } = await timed(() => getStakeAccounts(wallet.address));
+        const { result: accounts, elapsed_ms } = await timed(() => getSdk().stake.getStakeAccounts(wallet.address));
 
         if (isJsonMode()) {
           const totalClaimable = accounts.reduce((s, a) => s + a.claimableExcess, 0);
@@ -75,7 +70,7 @@ export function registerStakeCommand(program: Command): void {
         const validatorLabel = opts.validator || `Solana Compass (${shortenAddress(SOLANA_COMPASS_VOTE, 7)})`;
 
         const { result, elapsed_ms } = await timed(() =>
-          createAndDelegateStake(walletName, amount, opts.validator)
+          getSdk().stake.createAndDelegateStake(walletName, amount, opts.validator)
         );
 
         if (isJsonMode()) {
@@ -105,7 +100,7 @@ export function registerStakeCommand(program: Command): void {
         }
 
         const { result, elapsed_ms } = await timed(() =>
-          withdrawStake(walletName, stakeAccount, amountSol, opts.force)
+          getSdk().stake.withdrawStake(walletName, stakeAccount, amountSol, opts.force)
         );
 
         if (isJsonMode()) {
@@ -130,9 +125,11 @@ export function registerStakeCommand(program: Command): void {
     .action(async (stakeAccount: string | undefined, opts) => {
       try {
         const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
+        const wallet = walletRepo.getWallet(walletName);
+        if (!wallet) throw new Error(`Wallet "${walletName}" not found`);
 
         const { result: results, elapsed_ms } = await timed(() =>
-          claimMev(walletName, stakeAccount, opts.withdraw)
+          getSdk().stake.claimMev(walletName, wallet.address, stakeAccount, opts.withdraw)
         );
 
         if (isJsonMode()) {

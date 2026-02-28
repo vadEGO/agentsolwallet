@@ -1,8 +1,6 @@
 import { Command } from 'commander';
 import * as walletManager from '../core/wallet-manager.js';
-import { getSolBalance, getTokenBalances } from '../core/token-service.js';
-import { getPrices } from '../core/price-service.js';
-import { getOnrampUrl } from '../core/onramp-service.js';
+import { getSdk } from '../sdk-init.js';
 import { setConfigValue, isPermitted } from '../core/config-manager.js';
 import { output, success, failure, isJsonMode, timed, fmtPrice } from '../output/formatter.js';
 import { table } from '../output/table.js';
@@ -72,7 +70,7 @@ export function registerWalletCommand(program: Command): void {
 
         // Fetch SOL balances in parallel
         const balances = await Promise.all(
-          wallets.map(w => getSolBalance(w.address).catch(() => null))
+          wallets.map(w => getSdk().token.getSolBalance(w.address).catch(() => null))
         );
 
         if (isJsonMode()) {
@@ -133,11 +131,12 @@ export function registerWalletCommand(program: Command): void {
           const walletName = pick ? walletManager.resolveWalletName(pick) : walletManager.getDefaultWalletName();
           const wallet = walletRepo.getWallet(walletName)!;
 
-          const balances = await getTokenBalances(wallet.address);
+          const sdk = getSdk();
+          const balances = await sdk.token.getTokenBalances(wallet.address);
 
           // Get USD prices for all tokens
           const mints = balances.map(b => b.mint);
-          const prices = await getPrices(mints);
+          const prices = await sdk.price.getPrices(mints);
 
           return {
             wallet: walletName,
@@ -294,7 +293,7 @@ export function registerWalletCommand(program: Command): void {
         const walletName = pick ? walletManager.resolveWalletName(pick) : walletManager.getDefaultWalletName();
         const wallet = walletRepo.getWallet(walletName)!;
 
-        const url = getOnrampUrl({
+        const url = getSdk().onramp.getUrl({
           walletAddress: wallet.address,
           amount: opts?.amount,
           provider: opts?.provider,

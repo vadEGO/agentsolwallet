@@ -1,6 +1,6 @@
 import { Command } from 'commander';
-import * as predictService from '../core/predict-service.js';
-import { PREDICT_CATEGORIES } from '../core/predict/predict-provider.js';
+import { ensureProviders } from '../sdk-init.js';
+import { PREDICT_CATEGORIES } from '@solana-compass/sdk';
 import { getDefaultWalletName, resolveWalletName } from '../core/wallet-manager.js';
 import { isPermitted } from '../core/config-manager.js';
 import { output, success, failure, isJsonMode, timed } from '../output/formatter.js';
@@ -21,8 +21,9 @@ export function registerPredictCommand(program: Command): void {
     .option('--limit <n>', 'Number of results', '20')
     .action(async (category: string | undefined, opts) => {
       try {
+        const sdk = await ensureProviders();
         const { result: events, elapsed_ms } = await timed(() =>
-          predictService.listEvents({
+          sdk.predict.listEvents({
             category,
             filter: opts.filter,
             limit: parseInt(opts.limit),
@@ -68,8 +69,9 @@ export function registerPredictCommand(program: Command): void {
     .option('--limit <n>', 'Number of results', '20')
     .action(async (query: string, opts) => {
       try {
+        const sdk = await ensureProviders();
         const { result: events, elapsed_ms } = await timed(() =>
-          predictService.searchEvents(query, parseInt(opts.limit))
+          sdk.predict.searchEvents(query, parseInt(opts.limit))
         );
 
         if (isJsonMode()) {
@@ -108,8 +110,9 @@ export function registerPredictCommand(program: Command): void {
     .description('Show event details with all markets')
     .action(async (eventId: string) => {
       try {
+        const sdk = await ensureProviders();
         const { result: event, elapsed_ms } = await timed(() =>
-          predictService.getEvent(eventId)
+          sdk.predict.getEvent(eventId)
         );
 
         if (isJsonMode()) {
@@ -156,10 +159,11 @@ export function registerPredictCommand(program: Command): void {
     .description('Market details — YES/NO prices, volume, orderbook')
     .action(async (marketId: string) => {
       try {
+        const sdk = await ensureProviders();
         const { result, elapsed_ms } = await timed(async () => {
           const [market, orderbookResult] = await Promise.all([
-            predictService.getMarket(marketId),
-            predictService.getOrderbook(marketId).catch(() => null),
+            sdk.predict.getMarket(marketId),
+            sdk.predict.getOrderbook(marketId).catch(() => null),
           ]);
           return { market, orderbook: orderbookResult };
         });
@@ -229,6 +233,7 @@ export function registerPredictCommand(program: Command): void {
         }
         const isYes = normalizedSide === 'yes';
 
+        const sdk = await ensureProviders();
         const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
         const wallet = walletRepo.getWallet(walletName);
         if (!wallet) throw new Error(`Wallet "${walletName}" not found`);
@@ -239,7 +244,7 @@ export function registerPredictCommand(program: Command): void {
         }
 
         const { result, elapsed_ms } = await timed(() =>
-          predictService.buy(walletName, marketId, isYes, amount, maxPrice)
+          sdk.predict.buy(walletName, marketId, isYes, amount, maxPrice)
         );
 
         // Track position locally
@@ -288,12 +293,13 @@ export function registerPredictCommand(program: Command): void {
     .option('--min-price <price>', 'Minimum sell price per contract (0-1)')
     .action(async (positionPubkey: string, opts) => {
       try {
+        const sdk = await ensureProviders();
         const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
 
         const minPrice = opts.minPrice ? parseFloat(opts.minPrice) : undefined;
 
         const { result, elapsed_ms } = await timed(() =>
-          predictService.sell(walletName, positionPubkey, minPrice)
+          sdk.predict.sell(walletName, positionPubkey, minPrice)
         );
 
         // Update local tracking
@@ -324,10 +330,11 @@ export function registerPredictCommand(program: Command): void {
     .option('--wallet <name>', 'Wallet to use')
     .action(async (positionPubkey: string, opts) => {
       try {
+        const sdk = await ensureProviders();
         const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
 
         const { result, elapsed_ms } = await timed(() =>
-          predictService.claim(walletName, positionPubkey)
+          sdk.predict.claim(walletName, positionPubkey)
         );
 
         // Update local tracking
@@ -363,12 +370,13 @@ export function registerPredictCommand(program: Command): void {
     .option('--wallet <name>', 'Wallet to check')
     .action(async (opts) => {
       try {
+        const sdk = await ensureProviders();
         const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
         const wallet = walletRepo.getWallet(walletName);
         if (!wallet) throw new Error(`Wallet "${walletName}" not found`);
 
         const { result: positions, elapsed_ms } = await timed(() =>
-          predictService.getPositions(wallet.address)
+          sdk.predict.getPositions(wallet.address)
         );
 
         if (isJsonMode()) {
@@ -425,12 +433,13 @@ export function registerPredictCommand(program: Command): void {
     .option('--limit <n>', 'Number of entries', '50')
     .action(async (opts) => {
       try {
+        const sdk = await ensureProviders();
         const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
         const wallet = walletRepo.getWallet(walletName);
         if (!wallet) throw new Error(`Wallet "${walletName}" not found`);
 
         const { result: entries, elapsed_ms } = await timed(() =>
-          predictService.getHistory(wallet.address, parseInt(opts.limit))
+          sdk.predict.getHistory(wallet.address, parseInt(opts.limit))
         );
 
         if (isJsonMode()) {

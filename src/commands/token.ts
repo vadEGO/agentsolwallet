@@ -1,20 +1,16 @@
 import { Command } from 'commander';
-import { resolveToken, resolveTokens, syncTokenCache } from '../core/token-registry.js';
-import { getPrices, getPrice } from '../core/price-service.js';
-import { getTokenBalances, getAllTokenAccounts, type TokenAccountInfo } from '../core/token-service.js';
-import { getQuote, executeSwap } from '../core/swap-service.js';
-import { getDefaultWalletName, resolveWalletName, loadSigner } from '../core/wallet-manager.js';
+import { getSdk } from '../sdk-init.js';
+import { getDefaultWalletName, resolveWalletName } from '../core/wallet-manager.js';
 import { output, success, failure, isJsonMode, timed, verbose, fmtPrice } from '../output/formatter.js';
 import { table } from '../output/table.js';
 import { isValidAddress, solToLamports, uiToTokenAmount, explorerUrl, SOL_MINT } from '../utils/solana.js';
-import { buildAndSendTransaction } from '../core/transaction.js';
 import { isPermitted } from '../core/config-manager.js';
 import { address, type Instruction } from '@solana/kit';
 import { getTransferSolInstruction } from '@solana-program/system';
 import { getBurnCheckedInstruction, getCloseAccountInstruction } from '@solana-program/token';
 import * as walletRepo from '../db/repos/wallet-repo.js';
-import { getCategories, browseTokens } from '../core/token-lists.js';
 import { registerOrderCommands } from './token-orders.js';
+import type { TokenAccountInfo } from '@solana-compass/sdk';
 
 export function registerTokenCommand(program: Command): void {
   const token = program.command('token').description('Token operations');
@@ -25,9 +21,10 @@ export function registerTokenCommand(program: Command): void {
     .action(async (symbols: string[]) => {
       try {
         const { result: data, elapsed_ms } = await timed(async () => {
-          const resolved = await resolveTokens(symbols);
+          const sdk = getSdk();
+          const resolved = await sdk.registry.resolveTokens(symbols);
           const mints = [...resolved.values()].map(t => t.mint);
-          const prices = await getPrices(mints);
+          const prices = await sdk.price.getPrices(mints);
 
           return symbols.map(sym => {
             const token = resolved.get(sym);
@@ -65,7 +62,7 @@ export function registerTokenCommand(program: Command): void {
     .action(async (symbol: string) => {
       try {
         const { result: data, elapsed_ms } = await timed(async () => {
-          const token = await resolveToken(symbol);
+          const token = await getSdk().registry.resolveToken(symbol);
           if (!token) throw new Error(`Unknown token: ${symbol}`);
           return token;
         });
@@ -93,7 +90,7 @@ export function registerTokenCommand(program: Command): void {
         const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
         const wallet = walletRepo.getWallet(walletName)!;
 
-        const { result: balances, elapsed_ms } = await timed(() => getTokenBalances(wallet.address));
+        const { result: balances, elapsed_ms } = await timed(() => getSdk().token.getTokenBalances(wallet.address));
 
         if (isJsonMode()) {
           output(success({ wallet: walletName, tokens: balances }, { elapsed_ms }));
@@ -127,7 +124,7 @@ export function registerTokenCommand(program: Command): void {
     .description('Refresh token metadata cache from Jupiter')
     .action(async () => {
       try {
-        const { result: count, elapsed_ms } = await timed(() => syncTokenCache());
+        const { result: count, elapsed_ms } = await timed(() => getSdk().registry.syncTokenCache());
 
         if (isJsonMode()) {
           output(success({ tokensCached: count }, { elapsed_ms }));
@@ -151,7 +148,7 @@ export function registerTokenCommand(program: Command): void {
       try {
         if (!category) {
           // List available categories
-          const categories = getCategories();
+          const categories = getSdk().lists.getCategories();
           if (isJsonMode()) {
             output(success(categories));
           } else {
@@ -166,7 +163,7 @@ export function registerTokenCommand(program: Command): void {
         }
 
         const { result: entries, elapsed_ms } = await timed(() =>
-          browseTokens(category, { interval: opts.interval, limit: opts.limit })
+          getSdk().lists.browseTokens(category, { interval: opts.interval, limit: opts.limit })
         );
 
         if (isJsonMode()) {
@@ -216,8 +213,9 @@ export function registerTokenCommand(program: Command): void {
         const amount = parseFloat(amountStr);
         if (isNaN(amount) || amount <= 0) throw new Error('Invalid amount');
 
+        const sdk = getSdk();
         const { result: quote, elapsed_ms } = await timed(() =>
-          getQuote(from, to, amount, { slippageBps: opts.slippage, router: opts.router })
+          sdk.swap.getQuote(from, to, amount, { slippageBps: opts.slippage, router: opts.router })
         );
 
         if (opts.quoteOnly) {
@@ -242,7 +240,7 @@ export function registerTokenCommand(program: Command): void {
         }
 
         const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
-        const result = await executeSwap(from, to, amount, walletName, { slippageBps: opts.slippage, router: opts.router });
+        const result = await sdk.swap.executeSwap(from, to, amount, walletName, { slippageBps: opts.slippage, router: opts.router });
 
         if (isJsonMode()) {
           output(success(result, { elapsed_ms }));
@@ -269,10 +267,11 @@ export function registerTokenCommand(program: Command): void {
         if (isNaN(amount) || amount <= 0) throw new Error('Invalid amount');
         if (!isValidAddress(recipient)) throw new Error('Invalid recipient address');
 
+        const sdk = getSdk();
         const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
-        const signer = await loadSigner(walletName);
+        const signer = await sdk.ctx.signer.getSigner(walletName);
 
-        const tokenMeta = await resolveToken(tokenSymbol);
+        const tokenMeta = await sdk.registry.resolveToken(tokenSymbol);
         if (!tokenMeta) throw new Error(`Unknown token: ${tokenSymbol}`);
 
         if (!opts.yes && !isJsonMode()) {
@@ -286,7 +285,7 @@ export function registerTokenCommand(program: Command): void {
             amount: solToLamports(amount),
           });
 
-          const result = await buildAndSendTransaction([ix], signer, {
+          const result = await sdk.tx.buildAndSendTransaction([ix], signer, {
             txType: 'transfer',
             walletName,
             fromMint: SOL_MINT,
@@ -331,17 +330,18 @@ export function registerTokenCommand(program: Command): void {
     .action(async (symbol: string, amountStr: string | undefined, opts) => {
       try {
         const { result: data, elapsed_ms } = await timed(async () => {
+          const sdk = getSdk();
           const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
-          const signer = await loadSigner(walletName);
+          const signer = await sdk.ctx.signer.getSigner(walletName);
           const wallet = walletRepo.getWallet(walletName);
           if (!wallet) throw new Error(`Wallet "${walletName}" not found`);
 
-          const tokenMeta = await resolveToken(symbol);
+          const tokenMeta = await sdk.registry.resolveToken(symbol);
           if (!tokenMeta) throw new Error(`Unknown token: ${symbol}`);
           if (tokenMeta.mint === SOL_MINT) throw new Error('Cannot burn native SOL');
 
           // Find the token account
-          const accounts = await getAllTokenAccounts(wallet.address);
+          const accounts = await sdk.token.getAllTokenAccounts(wallet.address);
           const tokenAccount = accounts.find(a => a.mint === tokenMeta.mint);
           if (!tokenAccount) throw new Error(`No token account found for ${tokenMeta.symbol}`);
 
@@ -389,7 +389,7 @@ export function registerTokenCommand(program: Command): void {
             );
           }
 
-          const result = await buildAndSendTransaction(instructions, signer, {
+          const result = await sdk.tx.buildAndSendTransaction(instructions, signer, {
             txType: 'burn',
             walletName,
             fromMint: tokenMeta.mint,
@@ -436,17 +436,18 @@ export function registerTokenCommand(program: Command): void {
         if (opts.burn && !isPermitted('canBurn')) throw new Error('Permission denied: canBurn is disabled');
 
         const { result: data, elapsed_ms } = await timed(async () => {
+          const sdk = getSdk();
           const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
-          const signer = await loadSigner(walletName);
+          const signer = await sdk.ctx.signer.getSigner(walletName);
           const wallet = walletRepo.getWallet(walletName);
           if (!wallet) throw new Error(`Wallet "${walletName}" not found`);
 
-          const accounts = await getAllTokenAccounts(wallet.address);
+          const accounts = await sdk.token.getAllTokenAccounts(wallet.address);
 
           // If specific token, filter to just that one
           let targets: TokenAccountInfo[];
           if (symbol) {
-            const tokenMeta = await resolveToken(symbol);
+            const tokenMeta = await sdk.registry.resolveToken(symbol);
             if (!tokenMeta) throw new Error(`Unknown token: ${symbol}`);
             targets = accounts.filter(a => a.mint === tokenMeta.mint);
             if (targets.length === 0) throw new Error(`No token account found for ${symbol}`);
@@ -465,7 +466,7 @@ export function registerTokenCommand(program: Command): void {
 
           // Get prices for non-zero accounts
           const nonZeroMints = targets.filter(a => a.balance !== '0').map(a => a.mint);
-          const prices = nonZeroMints.length > 0 ? await getPrices(nonZeroMints) : new Map();
+          const prices = nonZeroMints.length > 0 ? await sdk.price.getPrices(nonZeroMints) : new Map();
 
           for (const account of targets) {
             if (account.balance === '0') {
@@ -504,7 +505,7 @@ export function registerTokenCommand(program: Command): void {
               if (account.mint === SOL_MINT) continue;
               try {
                 if (!isJsonMode()) console.log(`  Swapping ${account.uiBalance} ${account.symbol} to SOL...`);
-                const swapResult = await executeSwap(
+                const swapResult = await sdk.swap.executeSwap(
                   account.symbol, 'SOL', account.uiBalance, walletName,
                   { rewardBps: 500 }
                 );
@@ -579,7 +580,7 @@ export function registerTokenCommand(program: Command): void {
             );
 
             try {
-              const txResult = await buildAndSendTransaction(instructions, signer, {
+              const txResult = await sdk.tx.buildAndSendTransaction(instructions, signer, {
                 txType: 'close',
                 walletName,
               });
