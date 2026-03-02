@@ -6,10 +6,13 @@ import {
   setTransactionMessageFeePayer,
   setTransactionMessageLifetimeUsingBlockhash,
   appendTransactionMessageInstructions,
+  compressTransactionMessageUsingAddressLookupTables,
+  fetchAddressesForLookupTables,
   type TransactionSigner,
   type Instruction,
   type Rpc,
   type SolanaRpcApi,
+  type Address,
 } from '@solana/kit';
 import { getBase64EncodedWireTransaction } from '@solana/transactions';
 import type { SolContext, SendResult } from '../types.js';
@@ -73,9 +76,14 @@ export function injectSigners(
   return instructions.map(ix => ({
     ...ix,
     accounts: (ix.accounts ?? []).map((acc: any) => {
-      if ((acc.role === 2 || acc.role === 3) && signerMap.has(acc.address) && !acc.signer) {
-        return { ...acc, signer: signerMap.get(acc.address)! };
-      }
+      const signer = signerMap.get(acc.address);
+      if (!signer || acc.signer) return acc;
+      // Already has signer role — just attach signer object
+      if (acc.role === 2 || acc.role === 3) return { ...acc, signer };
+      // v1 SDKs may not set isSigner on instruction accounts, relying on
+      // transaction-level signing. Upgrade the role when address matches.
+      if (acc.role === 0) return { ...acc, role: 2, signer }; // READONLY → READONLY_SIGNER
+      if (acc.role === 1) return { ...acc, role: 3, signer }; // WRITABLE → WRITABLE_SIGNER
       return acc;
     }),
   }));
@@ -107,6 +115,8 @@ export interface BuildAndSendOpts {
   toAmount?: string;
   fromPriceUsd?: number;
   toPriceUsd?: number;
+  /** Address lookup table addresses to compress the transaction with */
+  addressLookupTableAddresses?: Address[];
 }
 
 export interface SendEncodedOpts {
@@ -144,12 +154,24 @@ export function createTransactionService(ctx: SolContext): TransactionService {
         const analyticsIx = ctx.analyticsInstruction?.();
         if (analyticsIx) allInstructions.push(analyticsIx);
 
-        const message = pipe(
+        let message = pipe(
           createTransactionMessage({ version: 0 }),
           m => setTransactionMessageFeePayer(payer.address, m),
           m => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, m),
           m => appendTransactionMessageInstructions(injectSigners(allInstructions, [payer]), m),
         );
+
+        // Compress using address lookup tables if provided
+        if (opts.addressLookupTableAddresses?.length) {
+          const addressesByLookupTable = await fetchAddressesForLookupTables(
+            opts.addressLookupTableAddresses,
+            rpc as any,
+          );
+          message = compressTransactionMessageUsingAddressLookupTables(
+            message,
+            addressesByLookupTable,
+          ) as typeof message;
+        }
 
         const signedTx = await signTransactionMessageWithSigners(message);
         const signature = getSignatureFromTransaction(signedTx);

@@ -10,6 +10,8 @@ import type { PredictService } from './predict-service.js';
 import type { PredictionPosition } from './predict/predict-provider.js';
 import type { EarnService } from './earn-service.js';
 import type { EarnPosition } from './earn/earn-provider.js';
+import type { LpService } from './lp-service.js';
+import type { LpPositionInfo } from './lp/lp-provider.js';
 
 // ── Types ─────────────────────────────────────────────────
 
@@ -74,6 +76,7 @@ interface PortfolioDeps {
   order: OrderService;
   predict: PredictService;
   earn: EarnService;
+  lp: LpService;
 }
 
 export function createPortfolioService(ctx: SolContext, deps: PortfolioDeps): PortfolioService {
@@ -83,7 +86,7 @@ export function createPortfolioService(ctx: SolContext, deps: PortfolioDeps): Po
     if (wallets.length === 0) throw new Error('No wallets provided');
 
     const walletData = await Promise.all(wallets.map(async (w) => {
-      const [tokens, stakes, lends, orders, predictions, earns] = await Promise.all([
+      const [tokens, stakes, lends, orders, predictions, earns, lpPositions] = await Promise.all([
         deps.token.getTokenBalances(w.address),
         deps.stake.getStakeAccounts(w.address),
         deps.lend.getPositions(w.address).catch((err) => {
@@ -102,17 +105,22 @@ export function createPortfolioService(ctx: SolContext, deps: PortfolioDeps): Po
           logger.verbose(`Could not fetch earn positions: ${err}`);
           return [] as EarnPosition[];
         }),
+        deps.lp.getPositions(w.address).catch((err) => {
+          logger.verbose(`Could not fetch LP positions: ${err}`);
+          return [] as LpPositionInfo[];
+        }),
       ]);
-      return { wallet: w, tokens, stakes, lends, orders, predictions, earns };
+      return { wallet: w, tokens, stakes, lends, orders, predictions, earns, lpPositions };
     }));
 
     // Collect all mints for batch price fetch
     const allMints = new Set<string>();
-    for (const { tokens, lends, orders, earns } of walletData) {
+    for (const { tokens, lends, orders, earns, lpPositions } of walletData) {
       for (const t of tokens) allMints.add(t.mint);
       for (const l of lends) allMints.add(l.mint);
       for (const o of orders) allMints.add(o.inputMint);
       for (const e of earns) allMints.add(e.mint);
+      for (const lp of lpPositions) { allMints.add(lp.mintA); allMints.add(lp.mintB); }
     }
     allMints.add(SOL_MINT);
 
@@ -122,7 +130,7 @@ export function createPortfolioService(ctx: SolContext, deps: PortfolioDeps): Po
     const positions: PortfolioPosition[] = [];
     let claimableMev = 0;
 
-    for (const { wallet, tokens, stakes, lends, orders, predictions, earns } of walletData) {
+    for (const { wallet, tokens, stakes, lends, orders, predictions, earns, lpPositions } of walletData) {
       for (const t of tokens) {
         const price = prices.get(t.mint);
         positions.push({
@@ -175,6 +183,22 @@ export function createPortfolioService(ctx: SolContext, deps: PortfolioDeps): Po
           type: 'earn', protocol: e.protocol, wallet: wallet.name, mint: e.mint, symbol: e.token,
           amount: e.depositedAmount, valueUsd,
           extra: { vaultId: e.vaultId, vaultName: e.vaultName, apy: e.apy, shares: e.shares },
+        });
+      }
+
+      for (const lp of lpPositions) {
+        positions.push({
+          type: 'lp', protocol: lp.protocol, wallet: wallet.name,
+          mint: lp.mintA, symbol: `${lp.tokenA}/${lp.tokenB}`,
+          amount: lp.amountA, valueUsd: lp.valueUsd,
+          extra: {
+            poolId: lp.poolId, positionId: lp.positionId, poolType: lp.poolType,
+            tokenA: lp.tokenA, tokenB: lp.tokenB, mintB: lp.mintB,
+            amountA: lp.amountA, amountB: lp.amountB,
+            unclaimedFeesUsd: lp.unclaimedFeesUsd,
+            lowerPrice: lp.lowerPrice, upperPrice: lp.upperPrice, inRange: lp.inRange,
+            pnl: lp.pnl,
+          },
         });
       }
     }

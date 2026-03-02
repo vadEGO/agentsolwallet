@@ -175,6 +175,106 @@ export function renderPortfolio(report: PortfolioReport): string {
     }, `  Total: $${fmt(earnTotal)}`));
   }
 
+  // ── LP Positions ──
+  const lpPositions = report.positions.filter(p => p.type === 'lp');
+  if (lpPositions.length > 0) {
+    const lpTotal = lpPositions.reduce((s, p) => s + (p.valueUsd ?? 0), 0);
+    const feesTotal = lpPositions.reduce((s, p) => s + ((p.extra?.unclaimedFeesUsd as number) ?? 0), 0);
+    const outOfRange = lpPositions.filter(p => p.extra?.inRange === false).length;
+
+    const footnotes: string[] = [];
+    footnotes.push(`  Total: $${fmt(lpTotal)}` + (feesTotal > 0 ? `  Unclaimed fees: $${fmt(feesTotal)}` : ''));
+    if (outOfRange > 0) {
+      footnotes.push(`  ${outOfRange} position${outOfRange > 1 ? 's' : ''} out of range (not earning fees).`);
+    }
+
+    // Check if any positions have P&L data
+    const hasPnl = lpPositions.some(p => p.extra?.pnl != null);
+
+    sections.push(buildTableSection('LP Positions', {
+      rows: lpPositions.map(p => {
+        const tokenA = String(p.extra?.tokenA ?? '');
+        const tokenB = String(p.extra?.tokenB ?? '');
+        const amountA = p.extra?.amountA as number ?? p.amount;
+        const amountB = p.extra?.amountB as number ?? 0;
+        const poolType = String(p.extra?.poolType ?? 'amm');
+        const lower = p.extra?.lowerPrice as number | undefined;
+        const upper = p.extra?.upperPrice as number | undefined;
+        const inRange = p.extra?.inRange as boolean | undefined;
+        const fees = (p.extra?.unclaimedFeesUsd as number) ?? 0;
+
+        let rangeStr = 'full';
+        if (poolType === 'clmm' && lower != null && upper != null) {
+          rangeStr = `$${fmtPrice(lower)}\u2014$${fmtPrice(upper)}`;
+          if (inRange === true) rangeStr += ' \u2713';
+          else if (inRange === false) rangeStr += ' OUT';
+        } else if (p.protocol === 'kamino') {
+          rangeStr = 'managed';
+        }
+
+        return {
+          protocol: p.protocol ?? '',
+          pool: p.symbol,
+          type: poolType.toUpperCase(),
+          tokenACol: `${fmtAmount(amountA)} ${tokenA}`,
+          tokenBCol: `${fmtAmount(amountB)} ${tokenB}`,
+          value: p.valueUsd != null ? `$${fmt(p.valueUsd)}` : '\u2014',
+          fees: fees > 0 ? `$${fmt(fees)}` : '\u2014',
+          range: rangeStr,
+        };
+      }),
+      columns: [
+        { key: 'protocol', header: 'Protocol' },
+        { key: 'pool', header: 'Pool' },
+        { key: 'type', header: 'Type' },
+        { key: 'tokenACol', header: 'Token A', align: 'right' },
+        { key: 'tokenBCol', header: 'Token B', align: 'right' },
+        { key: 'value', header: 'Value', align: 'right' },
+        { key: 'fees', header: 'Fees', align: 'right' },
+        { key: 'range', header: 'Range' },
+      ],
+    }, footnotes.join('\n')));
+
+    // P&L sub-section (only when deposit-time data is available)
+    if (hasPnl) {
+      const pnlPositions = lpPositions.filter(p => p.extra?.pnl != null);
+      const pnlRows = pnlPositions.map(p => {
+        const pnl = p.extra!.pnl as Record<string, number>;
+        const il = pnl.ilUsd ?? 0;
+        const feesEarned = pnl.feesEarnedUsd ?? 0;
+        const net = pnl.netPnlUsd ?? 0;
+        const ratio = pnl.feeToIlRatio as number | null;
+        return {
+          pool: p.symbol,
+          deposit: `$${fmt(pnl.depositValueUsd ?? 0)}`,
+          current: p.valueUsd != null ? `$${fmt(p.valueUsd)}` : '\u2014',
+          il: il !== 0 ? `-$${fmt(Math.abs(il))}` : '\u2014',
+          feesCol: feesEarned > 0 ? `$${fmt(feesEarned)}` : '\u2014',
+          net: `${net >= 0 ? '+' : ''}$${fmt(net)}`,
+          feeIl: ratio != null ? `${ratio.toFixed(2)}x` : '\u2014',
+        };
+      });
+
+      const totalDeposit = pnlPositions.reduce((s, p) => s + ((p.extra!.pnl as any).depositValueUsd ?? 0), 0);
+      const totalCurrent = pnlPositions.reduce((s, p) => s + (p.valueUsd ?? 0), 0);
+      const totalFees = pnlPositions.reduce((s, p) => s + ((p.extra!.pnl as any).feesEarnedUsd ?? 0), 0);
+      const totalNet = pnlPositions.reduce((s, p) => s + ((p.extra!.pnl as any).netPnlUsd ?? 0), 0);
+
+      sections.push(buildTableSection('LP P&L', {
+        rows: pnlRows,
+        columns: [
+          { key: 'pool', header: 'Pool' },
+          { key: 'deposit', header: 'Deposit', align: 'right' },
+          { key: 'current', header: 'Current', align: 'right' },
+          { key: 'il', header: 'IL', align: 'right' },
+          { key: 'feesCol', header: 'Fees', align: 'right' },
+          { key: 'net', header: 'Net P&L', align: 'right' },
+          { key: 'feeIl', header: 'Fee/IL', align: 'right' },
+        ],
+      }, `  Deposited: $${fmt(totalDeposit)}  Current: $${fmt(totalCurrent)}  Fees: $${fmt(totalFees)}  Net: ${totalNet >= 0 ? '+' : ''}$${fmt(totalNet)}`));
+    }
+  }
+
   // ── Open Orders ──
   const orderPositions = report.positions.filter(p => p.type === 'order');
   if (orderPositions.length > 0) {
@@ -399,6 +499,13 @@ function miniBar(pct: number): string {
   const empty = FILL_BAR_WIDTH - filled;
   const bar = '\u2588'.repeat(filled) + '\u2591'.repeat(empty);
   return `${bar} ${pct.toFixed(0)}%`;
+}
+
+function fmtPrice(n: number): string {
+  if (n >= 1000) return n.toFixed(0);
+  if (n >= 1) return n.toFixed(2);
+  if (n >= 0.01) return n.toFixed(4);
+  return n.toExponential(1);
 }
 
 function predictLabel(eventTitle: string, marketTitle: string, maxLen: number): string {

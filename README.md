@@ -172,6 +172,29 @@ sol lend positions                            # All deposits and borrows across 
 
 Positions include real-time APY, USD values, and health factor monitoring. The CLI warns when health factor drops below 1.1. Without `--protocol`, deposits auto-select the highest-yielding protocol, and withdrawals/repays auto-detect which protocol holds the position.
 
+### lp — Multi-protocol liquidity provision
+
+Provide liquidity across Orca, Raydium, Meteora, and Kamino from a single interface. Browse pools, deposit with flexible price ranges, track positions with P&L and impermanent loss metrics, claim fees, and farm for extra rewards.
+
+```bash
+sol lp pools sol usdc                          # Browse SOL/USDC pools across protocols
+sol lp pools --sort apy --type clmm            # Highest APY concentrated pools
+sol lp info HJPj...abc                         # Detailed pool info
+
+sol lp deposit HJPj...abc 100 usdc             # Single-token deposit
+sol lp deposit HJPj...abc 5 sol 750 usdc       # Dual-token deposit
+sol lp deposit HJPj...abc 100 usdc --range 10  # CLMM: +/-10% price range
+
+sol lp positions                               # All positions with fees and range status
+sol lp claim 9xK...abc                         # Claim uncollected fees
+sol lp withdraw 9xK...abc                      # Full withdrawal + close position
+sol lp withdraw 9xK...abc --percent 50         # Partial withdrawal
+
+sol lp farm list                               # Staked positions and pending rewards
+sol lp farm stake 9xK...abc                    # Stake in farm for extra rewards
+sol lp farm harvest 9xK...abc                  # Claim farm rewards
+```
+
 ### portfolio — Unified view across all positions
 
 ```bash
@@ -188,7 +211,7 @@ sol portfolio pnl                             # P&L since first snapshot
 sol portfolio pnl --since 5                   # P&L since snapshot #5
 ```
 
-The portfolio aggregates tokens, staked SOL, lending positions, open orders, and prediction market positions across all wallets. Snapshots enable tracking changes over time — useful for agents that need to measure the impact of their actions.
+The portfolio aggregates tokens, staked SOL, lending positions, LP positions, open orders, and prediction market positions across all wallets. Snapshots enable tracking changes over time — useful for agents that need to measure the impact of their actions.
 
 ### predict — Prediction markets via Jupiter
 
@@ -380,8 +403,8 @@ All permissions default to `true` (omitted = permitted):
 | `canSwap` | `token swap`, `token close --all`, `token dca new/cancel`, `token limit new/cancel` |
 | `canStake` | `stake new` |
 | `canWithdrawStake` | `stake withdraw`, `stake claim-mev` |
-| `canLend` | `lend deposit` |
-| `canWithdrawLend` | `lend withdraw` |
+| `canLend` | `lend deposit`, `lp deposit`, `lp farm stake`, `lp create` |
+| `canWithdrawLend` | `lend withdraw`, `lp withdraw`, `lp claim`, `lp farm unstake/harvest` |
 | `canBorrow` | `lend borrow`, `lend repay` |
 | `canPredict` | `predict buy`, `predict sell`, `predict claim` |
 | `canFetch` | `fetch` (x402 payments) |

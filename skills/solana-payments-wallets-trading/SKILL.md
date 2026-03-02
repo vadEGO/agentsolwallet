@@ -2,11 +2,12 @@
 name: solana-payments-wallets-trading
 description: >-
   Pay people in SOL or USDC, buy and sell tokens, check prices, manage Solana
-  wallets, stake SOL, earn yield through lending, trade prediction markets,
-  pay for APIs via x402, and track portfolio performance — all from the
-  command line. No API keys, no private key env vars. Use when the user wants
-  to send crypto, trade, check balances, earn yield, bet on predictions,
-  pay for web resources, or see how their holdings are doing.
+  wallets, stake SOL, earn yield through lending, provide liquidity across
+  multiple DEXes, trade prediction markets, pay for APIs via x402, and track
+  portfolio performance — all from the command line. No API keys, no private
+  key env vars. Use when the user wants to send crypto, trade, check balances,
+  earn yield, provide liquidity, bet on predictions, pay for web resources,
+  or see how their holdings are doing.
 license: MIT
 metadata:
   author: solanaguide
@@ -193,6 +194,25 @@ sol lend positions                      # everything across all protocols
 
 See references/lending-commands.md for full details.
 
+## Provide Liquidity
+
+Add liquidity to pools across Orca, Raydium, Meteora, and Kamino.
+Browse pools by TVL/APY/volume, deposit with flexible price ranges,
+track positions with P&L and impermanent loss, and farm for extra
+rewards.
+
+```bash
+sol lp pools sol usdc                          # browse SOL/USDC pools
+sol lp pools --sort apy --type clmm            # highest APY concentrated pools
+sol lp deposit HJPj...abc 100 usdc --range 10  # deposit with +/-10% price range
+sol lp positions                               # all positions with P&L
+sol lp claim 9xK...abc                         # claim unclaimed fees
+sol lp withdraw 9xK...abc                      # remove liquidity
+```
+
+See references/lp-commands.md for full details including farming,
+pool creation, and protocol-specific flags.
+
 ## Trade Prediction Markets
 
 Browse and trade prediction markets from Polymarket and Kalshi via
@@ -335,8 +355,8 @@ canFetch = false
 | `canSwap` | `token swap`, `token close --all`, `token dca new/cancel`, `token limit new/cancel` |
 | `canStake` | `stake new` |
 | `canWithdrawStake` | `stake withdraw`, `stake claim-mev` |
-| `canLend` | `lend deposit` |
-| `canWithdrawLend` | `lend withdraw` |
+| `canLend` | `lend deposit`, `lp deposit`, `lp farm stake`, `lp create` |
+| `canWithdrawLend` | `lend withdraw`, `lp withdraw`, `lp claim`, `lp farm unstake/harvest` |
 | `canBorrow` | `lend borrow`, `lend repay` |
 | `canBurn` | `token burn`, `token close --burn` |
 | `canCreateWallet` | `wallet create`, `wallet import` |
@@ -344,7 +364,7 @@ canFetch = false
 | `canExportWallet` | `wallet export` |
 | `canFetch` | `fetch` (x402 payments) |
 
-Read-only commands (`token browse/price/info/list`, `wallet list/balance`, `stake list`, `lend rates/positions`, `portfolio`, `network`, `tx`) are always available regardless of permissions.
+Read-only commands (`token browse/price/info/list`, `wallet list/balance`, `stake list`, `lend rates/positions`, `lp pools/info/positions/farm list`, `portfolio`, `network`, `tx`) are always available regardless of permissions.
 
 ## Security Controls
 

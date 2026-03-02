@@ -9,6 +9,7 @@ import { createSwapService, type SwapService } from './services/swap-service.js'
 import { createStakeService, type StakeService } from './services/stake-service.js';
 import { createLendService, type LendService } from './services/lend-service.js';
 import { createEarnService, type EarnService } from './services/earn-service.js';
+import { createLpService, type LpService } from './services/lp-service.js';
 import { createOrderService, type OrderService } from './services/order-service.js';
 import { createPredictService, type PredictService } from './services/predict-service.js';
 import { createPortfolioService, type PortfolioService } from './services/portfolio-service.js';
@@ -24,6 +25,7 @@ export interface SolSdk {
   stake: StakeService;
   lend: LendService;
   earn: EarnService;
+  lp: LpService;
   order: OrderService;
   predict: PredictService;
   portfolio: PortfolioService;
@@ -60,17 +62,18 @@ export function createSolSdk(opts: SolSdkOptions): SolSdk {
   const stake = createStakeService(ctx, tx);
   const lend = createLendService(ctx);
   const earn = createEarnService(ctx, { price });
+  const lp = createLpService(ctx, { price });
   const order = createOrderService(ctx, { registry, price });
   const predict = createPredictService(ctx);
 
   // Aggregation
-  const portfolio = createPortfolioService(ctx, { price, token, stake, lend, order, predict, earn });
+  const portfolio = createPortfolioService(ctx, { price, token, stake, lend, order, predict, earn, lp });
 
   // Utility services
   const x402 = createX402Service(ctx);
   const onramp = createOnrampService(ctx);
 
-  return { price, token, registry, lists, swap, stake, lend, earn, order, predict, portfolio, x402, onramp, tx, ctx };
+  return { price, token, registry, lists, swap, stake, lend, earn, lp, order, predict, portfolio, x402, onramp, tx, ctx };
 }
 
 /**
@@ -79,7 +82,7 @@ export function createSolSdk(opts: SolSdkOptions): SolSdk {
  * gracefully skipped when not installed.
  */
 export async function registerDefaultProviders(sdk: SolSdk): Promise<void> {
-  const { ctx, lend, earn, predict, tx, registry, price, token } = sdk;
+  const { ctx, lend, earn, lp, predict, tx, registry, price, token } = sdk;
   const rpcUrl = ctx.rpcUrl;
 
   // ── Lend providers ─────────────────────────────────────
@@ -144,6 +147,46 @@ export async function registerDefaultProviders(sdk: SolSdk): Promise<void> {
     earn.registerProvider(new LoopscaleEarnProvider(ctx, { registry, price, tx }));
   } catch (e: any) {
     ctx.logger.verbose(`Loopscale earn provider skipped: ${e.message}`);
+  }
+
+  // ── LP providers ─────────────────────────────────────
+
+  // Orca (requires @orca-so/whirlpools)
+  try {
+    const { OrcaLpProvider } = await import('./services/lp/orca-provider.js');
+    lp.registerProvider(new OrcaLpProvider(ctx, { registry, price, tx }));
+  } catch (e: any) {
+    ctx.logger.verbose(`Orca LP provider skipped: ${e.message}`);
+  }
+
+  // Raydium (requires @raydium-io/raydium-sdk-v2)
+  if (rpcUrl) {
+    try {
+      const { RaydiumLpProvider } = await import('./services/lp/raydium-provider.js');
+      lp.registerProvider(new RaydiumLpProvider(ctx, { registry, price, tx, rpcUrl }));
+    } catch (e: any) {
+      ctx.logger.verbose(`Raydium LP provider skipped: ${e.message}`);
+    }
+  }
+
+  // Meteora (requires @meteora-ag/dlmm + @meteora-ag/cp-amm-sdk)
+  if (rpcUrl) {
+    try {
+      const { MeteoraLpProvider } = await import('./services/lp/meteora-provider.js');
+      lp.registerProvider(new MeteoraLpProvider(ctx, { registry, price, tx, rpcUrl }));
+    } catch (e: any) {
+      ctx.logger.verbose(`Meteora LP provider skipped: ${e.message}`);
+    }
+  }
+
+  // Kamino LP (requires @kamino-finance/kliquidity-sdk)
+  if (rpcUrl) {
+    try {
+      const { KaminoLpProvider } = await import('./services/lp/kamino-lp-provider.js');
+      lp.registerProvider(new KaminoLpProvider(ctx, { registry, price, tx, rpcUrl }));
+    } catch (e: any) {
+      ctx.logger.verbose(`Kamino LP provider skipped: ${e.message}`);
+    }
   }
 
   // ── Predict providers ──────────────────────────────────
