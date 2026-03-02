@@ -2,12 +2,12 @@
 name: solana-payments-wallets-trading
 description: >-
   Pay people in SOL or USDC, buy and sell tokens, check prices, manage Solana
-  wallets, stake SOL, earn yield through lending, provide liquidity across
-  multiple DEXes, trade prediction markets, pay for APIs via x402, and track
-  portfolio performance — all from the command line. No API keys, no private
-  key env vars. Use when the user wants to send crypto, trade, check balances,
-  earn yield, provide liquidity, bet on predictions, pay for web resources,
-  or see how their holdings are doing.
+  wallets, stake SOL, earn yield through lending and managed vaults, provide
+  liquidity across multiple DEXes, trade prediction markets, pay for APIs via
+  x402, and track portfolio performance — all from the command line. No API
+  keys, no private key env vars. Use when the user wants to send crypto, trade,
+  check balances, earn yield, provide liquidity, bet on predictions, pay for
+  web resources, or see how their holdings are doing.
 license: MIT
 metadata:
   author: solanaguide
@@ -194,6 +194,27 @@ sol lend positions                      # everything across all protocols
 
 See references/lending-commands.md for full details.
 
+## Earn Yield in Vaults
+
+Managed yield vaults across Kamino Earn and Loopscale. Unlike raw
+lending, vaults handle strategy management automatically — you deposit
+a token and the protocol optimizes yield. The CLI auto-picks the
+highest APY vault, or you can target a specific protocol or vault.
+
+```bash
+sol earn usdc                              # list USDC vaults with APY
+sol earn sol                               # list SOL vaults
+sol earn                                   # all vaults, sorted by APY
+sol earn deposit 100 usdc                  # auto-picks best APY vault
+sol earn deposit 5 sol --protocol kamino   # target specific protocol
+sol earn positions                         # your vault positions
+sol earn withdraw max usdc                 # full withdrawal
+sol earn withdraw 50 usdc --protocol loopscale
+```
+
+Earn positions appear in `sol portfolio` alongside tokens, staking,
+lending, and LP.
+
 ## Provide Liquidity
 
 Add liquidity to pools across Orca, Raydium, Meteora, and Kamino.
@@ -355,8 +376,8 @@ canFetch = false
 | `canSwap` | `token swap`, `token close --all`, `token dca new/cancel`, `token limit new/cancel` |
 | `canStake` | `stake new` |
 | `canWithdrawStake` | `stake withdraw`, `stake claim-mev` |
-| `canLend` | `lend deposit`, `lp deposit`, `lp farm stake`, `lp create` |
-| `canWithdrawLend` | `lend withdraw`, `lp withdraw`, `lp claim`, `lp farm unstake/harvest` |
+| `canLend` | `lend deposit`, `earn deposit`, `lp deposit`, `lp farm stake`, `lp create` |
+| `canWithdrawLend` | `lend withdraw`, `earn withdraw`, `lp withdraw`, `lp claim`, `lp farm unstake/harvest` |
 | `canBorrow` | `lend borrow`, `lend repay` |
 | `canBurn` | `token burn`, `token close --burn` |
 | `canCreateWallet` | `wallet create`, `wallet import` |
@@ -364,7 +385,7 @@ canFetch = false
 | `canExportWallet` | `wallet export` |
 | `canFetch` | `fetch` (x402 payments) |
 
-Read-only commands (`token browse/price/info/list`, `wallet list/balance`, `stake list`, `lend rates/positions`, `lp pools/info/positions/farm list`, `portfolio`, `network`, `tx`) are always available regardless of permissions.
+Read-only commands (`token browse/price/info/list`, `wallet list/balance`, `stake list`, `lend rates/positions`, `earn list/positions`, `lp pools/info/positions/configs/farm list`, `portfolio`, `network`, `tx`) are always available regardless of permissions.
 
 ## Security Controls
 
