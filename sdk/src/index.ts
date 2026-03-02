@@ -47,6 +47,16 @@ export type { EarnService, VaultsResult } from './services/earn-service.js';
 export { EARN_PROTOCOL_NAMES } from './services/earn/earn-provider.js';
 export type { EarnProvider, EarnVault, EarnPosition, EarnWriteResult } from './services/earn/earn-provider.js';
 
+// ── LP service ──────────────────────────────────────────
+export type { LpService, PoolsResult, PoolConfig } from './services/lp-service.js';
+export { LP_PROTOCOL_NAMES } from './services/lp/lp-provider.js';
+export { calculateIL } from './services/lp/lp-provider.js';
+export type {
+  LpProvider, LpPoolInfo, LpPositionInfo, LpDepositParams, LpDepositQuote,
+  LpWithdrawParams, LpWriteResult, LpFarmInfo, LpFarmResult,
+  CreatePoolParams, LpProviderCapabilities, LpPnlData, PoolType, ILResult,
+} from './services/lp/lp-provider.js';
+
 // ── Order service ────────────────────────────────────────────
 export { parseInterval } from './services/order-service.js';
 export type {
