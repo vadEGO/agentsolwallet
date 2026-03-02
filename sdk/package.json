@@ -30,6 +30,9 @@
     "@mrgnlabs/marginfi-client-v2": { "optional": true },
     "@coral-xyz/anchor": { "optional": true }
   },
+  "files": [
+    "dist/"
+  ],
   "engines": {
     "node": ">=20"
   },

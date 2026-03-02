@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { Command } from 'commander';
 import { setJsonMode, setVerboseMode } from './output/formatter.js';
 import { setRpcOverride } from './core/rpc.js';
@@ -15,12 +16,14 @@ import { registerPredictCommand } from './commands/predict.js';
 import { registerFetchCommand } from './commands/fetch.js';
 import { closeDb } from './db/database.js';
 
+const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+
 const program = new Command();
 
 program
   .name('sol')
   .description('Solana CLI for Humans and LLM Agents')
-  .version('0.2.0')
+  .version(pkg.version)
   .option('--json', 'Output structured JSON')
   .option('--rpc <url>', 'Override RPC endpoint')
   .option('--verbose', 'Verbose output')

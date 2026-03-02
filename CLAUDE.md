@@ -34,6 +34,40 @@ src/
 bin/sol.mjs             Node.js shim (execFileSync with tsx --import)
 ```
 
+## Local Development
+
+One-time setup:
+```bash
+npm run setup        # installs deps + npm-links 'sol' to this repo
+```
+
+After linking, `sol <cmd>` always runs live TypeScript source — no build step needed. The `bin/sol.mjs` shim detects `src/index.ts` and spawns tsx with `tsconfig.dev.json`, which maps `@solana-compass/sdk` to `sdk/src/` for live SDK resolution.
+
+Builds are only needed for publishing:
+```bash
+npm run build        # compiles SDK then CLI to dist/
+```
+
+Testing:
+```bash
+sol <cmd>            # human output
+sol <cmd> --json     # JSON output
+npm test             # unit tests
+```
+
+## Publishing
+
+Publish SDK first (CLI depends on it), then CLI:
+```bash
+npm run publish:all  # runs publish:sdk then npm publish
+```
+
+Or individually:
+```bash
+npm run publish:sdk  # @solana-compass/sdk only
+npm publish --access public  # @solana-compass/cli only
+```
+
 ## Code Conventions
 
 ### Imports
@@ -167,9 +201,12 @@ The CLI is published as a discoverable agent skill via three channels:
 
 When bumping the version, update ALL of these in sync:
 1. `package.json` → `version`
-2. `.claude-plugin/plugin.json` → `version`
-3. `.claude-plugin/marketplace.json` → `plugins[0].version`
-4. `skills/solana-payments-wallets-trading/SKILL.md` → frontmatter `version`
+2. `sdk/package.json` → `version`
+3. `.claude-plugin/plugin.json` → `version`
+4. `.claude-plugin/marketplace.json` → `plugins[0].version`
+5. `skills/solana-payments-wallets-trading/SKILL.md` → frontmatter `version`
+
+`src/index.ts` reads the version from `package.json` dynamically — no manual sync needed there.
 
 **Plugin users** get updates when they run `/plugin marketplace update solanaguide-solana-cli` or enable auto-update (disabled by default for third-party marketplaces). If you don't bump the version, the update is skipped — Claude Code treats same-version as unchanged.
 

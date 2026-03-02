@@ -12,8 +12,11 @@
   "scripts": {
     "dev": "tsx --tsconfig tsconfig.dev.json ./src/index.ts",
     "build:sdk": "cd sdk && tsc",
-    "build": "cd sdk && tsc && cd .. && tsc",
+    "build": "npm run build:sdk && tsc",
     "prepublishOnly": "npm run build",
+    "setup": "npm install && npm link",
+    "publish:sdk": "cd sdk && npm publish --access public",
+    "publish:all": "npm run publish:sdk && npm publish --access public",
     "test": "node --import tsx --test tests/**/*.test.ts"
   },
   "dependencies": {
