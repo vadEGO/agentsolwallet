@@ -11,7 +11,7 @@ description: >-
 license: MIT
 metadata:
   author: solanaguide
-  version: 0.2.4
+  version: 0.3.0
   openclaw:
     requires:
       bins:
