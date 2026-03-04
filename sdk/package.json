@@ -1,6 +1,6 @@
 {
   "name": "@solana-compass/sdk",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Solana SDK for building apps with Jupiter, Kamino, MarginFi, Drift, Loopscale, and more",
   "type": "module",
   "main": "dist/index.js",
@@ -20,7 +20,7 @@
   },
   "peerDependencies": {
     "@kamino-finance/klend-sdk": "^7.3.19",
-    "@drift-labs/sdk": "^2.155.0",
+    "@drift-labs/sdk": "2.155.0",
     "@mrgnlabs/marginfi-client-v2": "^6.4.1",
     "@coral-xyz/anchor": "^0.32.1"
   },
