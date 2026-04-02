@@ -691,13 +691,42 @@ export class RaydiumLpProvider implements LpProvider {
     let v1Instructions: any[] = [];
     const extraSigners: any[] = [];
 
-    if (poolType === 'clmm') {
+    // Detect pool type: try CLMM first, fall back to CPMM
+    let poolInfo: any;
+    let detectedType: 'clmm' | 'cpmm' = poolType === 'clmm' ? 'clmm' : 'cpmm';
+    try {
+      if (poolType === 'clmm') {
+        poolInfo = await raydium.clmm.getPoolInfoFromRpc(poolId);
+      } else {
+        poolInfo = await raydium.cpmm.getPoolInfoFromRpc(poolId);
+      }
+    } catch (err: any) {
+      this.ctx.logger.verbose(`${poolType} pool fetch failed, trying alternative: ${err.message}`);
+      // Try the other type
+      if (poolType === 'clmm') {
+        try {
+          poolInfo = await raydium.cpmm.getPoolInfoFromRpc(poolId);
+          detectedType = 'cpmm';
+          this.ctx.logger.verbose('Pool is CPMM, switching deposit strategy');
+        } catch (cpmmErr: any) {
+          throw new Error(`Pool ${poolId} not found as CLMM or CPMM on-chain`);
+        }
+      } else {
+        try {
+          poolInfo = await raydium.clmm.getPoolInfoFromRpc(poolId);
+          detectedType = 'clmm';
+          this.ctx.logger.verbose('Pool is CLMM, switching deposit strategy');
+        } catch (clmmErr: any) {
+          throw new Error(`Pool ${poolId} not found as CPMM or CLMM on-chain`);
+        }
+      }
+    }
+
+    if (detectedType === 'clmm') {
       // CLMM deposit — open position with range
       if (lowerPrice == null || upperPrice == null) {
         throw new Error('CLMM deposits require lowerPrice and upperPrice range parameters (use --range or --lower-price/--upper-price)');
       }
-
-      const poolInfo = await raydium.clmm.getPoolInfoFromRpc(poolId);
 
       // Convert prices to ticks using SDK utilities
       const tickLower = TickUtils.getPriceAndTick({
@@ -764,9 +793,8 @@ export class RaydiumLpProvider implements LpProvider {
           extraSigners.push(v2Signer);
         }
       }
-    } else {
-      // CPMM deposit
-      const poolInfo = await raydium.cpmm.getPoolInfoFromRpc(poolId);
+    } else if (detectedType === 'cpmm') {
+      // CPMM deposit - use already-fetched poolInfo
       const inputAmount = amountA
         ? BigInt(Math.floor(amountA * Math.pow(10, pool.mintA.decimals)))
         : BigInt(Math.floor((amountB ?? 0) * Math.pow(10, pool.mintB.decimals)));
