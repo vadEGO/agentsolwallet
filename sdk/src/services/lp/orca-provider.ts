@@ -115,8 +115,8 @@ export class OrcaLpProvider implements LpProvider {
       mintB: p.tokenB.address,
       tvlUsd: parseFloat(p.tvlUsdc ?? '0') || null,
       volume24hUsd: parseFloat(p.stats?.['24h']?.volume ?? '0') || null,
-      feeRate: p.feeRate,
-      apy: parseFloat(p.stats?.['24h']?.yieldOverTvl ?? '0') || null,
+      feeRate: p.feeRate / 1000000,  // Convert from millionths to percentage (e.g., 400 = 0.04%)
+      apy: (parseFloat(p.stats?.['24h']?.yieldOverTvl ?? '0') * 100) || null,
       currentPrice: parseFloat(p.price ?? '0') || 0,
       tickSpacing: p.tickSpacing,
     };
