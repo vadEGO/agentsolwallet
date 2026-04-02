@@ -45,18 +45,14 @@ Requires Node.js >= 20.
 
 ### Install as an Agent Skill
 
-AgentSolWallet is available as a discoverable skill for Claude Code and other LLM agents:
+AgentSolWallet includes a skill definition for LLM agents like OpenClaw. Clone this repo and link it:
 
 ```bash
-# Claude Code — add the marketplace, then install the plugin
-/plugin marketplace add vadEGO/agentsolwallet
-/plugin install agentsolwallet
-
-# skills.sh
-npx skills add vadEGO/agentsolwallet
+git clone https://github.com/vadEGO/agentsolwallet.git
+cd agentsolwallet && npm install && npm link
 ```
 
-Once installed, the agent can use Sol commands directly when you ask it to send crypto, trade tokens, check balances, stake, lend, or track portfolio performance.
+Once linked, the agent can use Sol commands directly when you ask it to send crypto, trade tokens, check balances, stake, lend, or track portfolio performance.
 
 ### First-time setup
 

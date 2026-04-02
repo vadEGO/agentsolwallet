@@ -191,11 +191,7 @@ Snapshots capture portfolio state at a point in time. The `snapshot_entries` tab
 
 ## Agent Skill Distribution
 
-The CLI is published as a discoverable agent skill via three channels:
-
-- **Claude Code plugin** — `.claude-plugin/marketplace.json` + `plugin.json` at repo root. Auto-discovered from GitHub.
-- **skills.sh** — `skills/agentsolwallet/SKILL.md` + `references/`. Discovered via npm package.
-- **ClawdHub** — same skill directory, published separately.
+The CLI is published as an OpenClaw skill via `.openclaw/config.json` at repo root.
 
 ### Versioning
 
@@ -208,11 +204,7 @@ When bumping the version, update ALL of these in sync:
 
 `src/index.ts` reads the version from `package.json` dynamically — no manual sync needed there.
 
-**Plugin users** get updates when they run `/plugin marketplace update agentsolwallet` or enable auto-update (disabled by default for third-party marketplaces). If you don't bump the version, the update is skipped — Claude Code treats same-version as unchanged.
-
-**skills.sh users** get updates when they re-run `npx skills add vadEGO/agentsolwallet` (pulls latest from npm). There's no global update command.
-
-Always `npm publish` after pushing so both channels are in sync.
+Always `npm publish` after pushing so channels are in sync.
 
 ## Testing
 
