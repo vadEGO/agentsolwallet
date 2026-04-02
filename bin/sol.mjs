@@ -6,8 +6,11 @@ import { existsSync } from 'node:fs';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
 const srcEntry = join(root, 'src', 'index.ts');
+const distEntry = join(root, 'dist', 'index.js');
 
-if (existsSync(srcEntry)) {
+if (existsSync(distEntry)) {
+  await import(pathToFileURL(distEntry).href);
+} else if (existsSync(srcEntry)) {
   // Dev mode: src/ exists → run TypeScript directly via tsx
   const { execFileSync } = await import('node:child_process');
   const tsx = join(root, 'node_modules', '.bin', 'tsx');
@@ -22,9 +25,10 @@ if (existsSync(srcEntry)) {
       ...process.argv.slice(2)
     ], { stdio: 'inherit', cwd: root });
   } catch (e) {
+    console.error('Failed to run the TypeScript CLI entrypoint. Try `npm run build` to generate dist/, then rerun `sol`.');
     process.exitCode = e.status ?? 1;
   }
 } else {
-  // Production: src/ absent → load compiled dist/
-  await import(pathToFileURL(join(root, 'dist', 'index.js')).href);
+  console.error('Could not find either src/index.ts or dist/index.js for the CLI entrypoint.');
+  process.exit(1);
 }

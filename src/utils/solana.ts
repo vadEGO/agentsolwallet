@@ -14,7 +14,11 @@ export function solToLamports(sol: number): bigint {
 }
 
 export function tokenAmountToUi(rawAmount: bigint | string, decimals: number): number {
-  return Number(BigInt(rawAmount)) / Math.pow(10, decimals);
+  const amount = BigInt(rawAmount);
+  const divisor = 10n ** BigInt(decimals);
+  const whole = amount / divisor;
+  const remainder = amount % divisor;
+  return Number(whole) + Number(remainder) / Number(divisor);
 }
 
 export function uiToTokenAmount(uiAmount: number, decimals: number): bigint {

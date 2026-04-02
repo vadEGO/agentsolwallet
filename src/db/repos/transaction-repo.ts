@@ -47,6 +47,39 @@ export function getTransactionBySignature(signature: string): TransactionRow | u
   ).get(signature) as TransactionRow | undefined;
 }
 
+export function upsertTransaction(row: Omit<TransactionRow, 'id'>): void {
+  getDb().prepare(`
+    INSERT INTO transaction_log
+      (signature, type, wallet_name, from_mint, to_mint, from_amount, to_amount, from_price_usd, to_price_usd, status, error, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(signature) DO UPDATE SET
+      type = excluded.type,
+      wallet_name = COALESCE(excluded.wallet_name, transaction_log.wallet_name),
+      from_mint = COALESCE(transaction_log.from_mint, excluded.from_mint),
+      to_mint = COALESCE(transaction_log.to_mint, excluded.to_mint),
+      from_amount = COALESCE(transaction_log.from_amount, excluded.from_amount),
+      to_amount = COALESCE(transaction_log.to_amount, excluded.to_amount),
+      from_price_usd = COALESCE(transaction_log.from_price_usd, excluded.from_price_usd),
+      to_price_usd = COALESCE(transaction_log.to_price_usd, excluded.to_price_usd),
+      status = excluded.status,
+      error = excluded.error,
+      created_at = excluded.created_at
+  `).run(
+    row.signature,
+    row.type,
+    row.wallet_name,
+    row.from_mint,
+    row.to_mint,
+    row.from_amount,
+    row.to_amount,
+    row.from_price_usd,
+    row.to_price_usd,
+    row.status,
+    row.error,
+    row.created_at,
+  );
+}
+
 export function getTransactionCount(walletName?: string): number {
   if (walletName) {
     const row = getDb().prepare(

@@ -6,6 +6,7 @@ import { output, success, failure, isJsonMode, timed, fmtPrice } from '../output
 import { table } from '../output/table.js';
 import * as walletRepo from '../db/repos/wallet-repo.js';
 import * as txRepo from '../db/repos/transaction-repo.js';
+import { syncRecentTransactions } from '../core/wallet-history.js';
 import { getWellKnownByMint } from '../utils/token-list.js';
 import { getTokenByMint } from '../db/repos/token-repo.js';
 import { shortenAddress, tokenAmountToUi, SOL_MINT } from '../utils/solana.js';
@@ -322,6 +323,7 @@ export function registerWalletCommand(program: Command): void {
       try {
         const pick = opts?.wallet || name;
         const walletName = pick ? walletManager.resolveWalletName(pick) : walletManager.getDefaultWalletName();
+        const sync = await syncRecentTransactions(walletName, opts?.limit ?? 20);
 
         const txs = txRepo.getRecentTransactions({
           walletName,
@@ -332,6 +334,7 @@ export function registerWalletCommand(program: Command): void {
         if (isJsonMode()) {
           output(success({
             wallet: walletName,
+            sync,
             transactions: txs.map(tx => ({
               ...tx,
               fromSymbol: mintToSymbol(tx.from_mint),
@@ -343,8 +346,14 @@ export function registerWalletCommand(program: Command): void {
           }));
         } else if (txs.length === 0) {
           console.log(`No transactions found for wallet "${walletName}".`);
+          if (sync.fetched === 0) {
+            console.log('No recent on-chain transactions were returned either.');
+          }
         } else {
           console.log(`Recent activity for "${walletName}":\n`);
+          if (sync.synced > 0) {
+            console.log(`Synced ${sync.synced} recent on-chain transaction${sync.synced === 1 ? '' : 's'} into the local cache.\n`);
+          }
           console.log(table(
             txs.map(tx => ({
               type: tx.type,
