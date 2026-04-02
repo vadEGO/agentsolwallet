@@ -566,6 +566,28 @@ export class KaminoLpProvider implements LpProvider {
     const strategyAddress = params.poolId;
     const DecimalCls = await getDecimalCls();
 
+    // Patch Kamino SDK to handle Scope oracle failures by returning empty but valid structures
+    const originalGetAllScope = (kamino as any).getAllScopePriceFeedsForStrategy?.bind(kamino);
+    if (originalGetAllScope) {
+      (kamino as any).getAllScopePriceFeedsForStrategy = (strategy: any, collateralInfos: any) => {
+        try {
+          return originalGetAllScope(strategy, collateralInfos);
+        } catch (err: any) {
+          if (err.message?.includes('RewardScopePriceAccountNotPresent')) {
+            this.ctx.logger.verbose('Scope oracle missing, using empty feeds');
+            // Return a structure that won't crash strategyTokenScopeFeedsToArray
+            return {
+              tokenAFeed: undefined,
+              tokenBFeed: undefined,
+              rewardsFeeds: [undefined, undefined, undefined],
+              kaminoRewardsFeeds: [undefined, undefined, undefined],
+            };
+          }
+          throw err;
+        }
+      };
+    }
+
     const strategy = await kamino.getStrategyByAddress(kAddress(strategyAddress));
     if (!strategy) throw new Error(`Kamino strategy not found: ${strategyAddress}`);
 

@@ -1,7 +1,7 @@
 {
   "name": "@agentsolwallet/cli",
   "version": "1.0.0",
-  "description": "AgentSolWallet \u2014 Solana tools for Humans and LLM Agents",
+  "description": "AgentSolWallet — Solana tools for Humans and LLM Agents",
   "type": "module",
   "workspaces": [
     "sdk"
@@ -30,6 +30,7 @@
     "@mrgnlabs/marginfi-client-v2": "^6.4.1",
     "@orca-so/whirlpools": "^5.0.0",
     "@orca-so/whirlpools-client": "^5.0.0",
+    "@raydium-io/raydium-sdk-v2": "^0.1.126-alpha",
     "@solana-program/stake": "0.3.0",
     "@solana-program/system": "^0.8.0",
     "@solana-program/token": "^0.6.0",
