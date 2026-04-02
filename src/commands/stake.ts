@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { getSdk } from '../sdk-init.js';
-import { SOLANA_COMPASS_VOTE } from '@solana-compass/sdk';
+import { AGENTSOLWALLET_VOTE } from '@agentsolwallet/sdk';
 import { getDefaultWalletName, resolveWalletName } from '../core/wallet-manager.js';
 import { isPermitted } from '../core/config-manager.js';
 import { assertWithinLimitsFromPrice } from '../core/security.js';
@@ -62,7 +62,7 @@ export function registerStakeCommand(program: Command): void {
     .command('new <amount>')
     .description('Create a stake account and delegate to a validator')
     .option('--wallet <name>', 'Wallet to use')
-    .option('--validator <vote>', 'Validator vote account (default: Solana Compass)')
+    .option('--validator <vote>', 'Validator vote account (default: recommended)')
     .action(async (amountStr: string, opts) => {
       try {
         const amount = parseFloat(amountStr);
@@ -74,7 +74,7 @@ export function registerStakeCommand(program: Command): void {
         assertWithinLimitsFromPrice(solPrice?.priceUsd, amount, 'staking');
 
         const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
-        const validatorLabel = opts.validator || `Solana Compass (${shortenAddress(SOLANA_COMPASS_VOTE, 7)})`;
+        const validatorLabel = opts.validator || `Recommended (${shortenAddress(AGENTSOLWALLET_VOTE, 7)})`;
 
         const { result, elapsed_ms } = await timed(() =>
           getSdk().stake.createAndDelegateStake(walletName, amount, opts.validator, {

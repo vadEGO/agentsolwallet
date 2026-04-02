@@ -1,4 +1,4 @@
-import type { SignerProvider } from '@solana-compass/sdk';
+import type { SignerProvider } from '@agentsolwallet/sdk';
 import type { TransactionSigner } from '@solana/kit';
 import { loadSigner, loadSignerRawBytes } from '../core/wallet-manager.js';
 

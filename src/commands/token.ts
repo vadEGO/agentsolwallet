@@ -18,7 +18,7 @@ import {
 } from '@solana-program/token';
 import * as walletRepo from '../db/repos/wallet-repo.js';
 import { registerOrderCommands } from './token-orders.js';
-import type { TokenAccountInfo } from '@solana-compass/sdk';
+import type { TokenAccountInfo } from '@agentsolwallet/sdk';
 
 export function registerTokenCommand(program: Command): void {
   const token = program.command('token').description('Token operations');
@@ -661,18 +661,6 @@ export function registerTokenCommand(program: Command): void {
             }
 
             if (instructions.length === 0) continue;
-
-            // 5% of reclaimed rent to compassSOL reserve
-            const RENT_PER_ACCOUNT = 2_039_280n;
-            const contributionPerAccount = RENT_PER_ACCOUNT * 5n / 100n;
-            const totalContribution = contributionPerAccount * BigInt(batch.length);
-            instructions.push(
-              getTransferSolInstruction({
-                source: signer,
-                destination: address('8H2xjMT543YWBLRjJ24BrQyBgFuQRU6MgENA3mqXoh7y'),
-                amount: totalContribution,
-              }),
-            );
 
             try {
               const txResult = await sdk.tx.buildAndSendTransaction(instructions, signer, {

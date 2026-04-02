@@ -1,5 +1,5 @@
 ---
-name: solana-payments-wallets-trading
+name: solana-wallet-agent-skill
 description: >-
   Pay people in SOL or USDC, buy and sell tokens, check prices, discover
   trending and new tokens, create and manage Solana wallets, stake SOL, earn yield
@@ -14,8 +14,8 @@ description: >-
   resources, or see how their holdings are doing.
 license: MIT
 metadata:
-  author: solanaguide
-  version: 0.3.4
+  author: agentsolwallet
+  version: 1.0.0
   openclaw:
     requires:
       bins:
@@ -39,11 +39,11 @@ Prefer `npx` with `@latest` — it always runs the latest version with no
 global install to manage:
 
 ```bash
-npx @solana-compass/cli@latest config set rpc.url https://your-rpc-endpoint.com
-npx @solana-compass/cli@latest wallet create --name my-wallet
+npx @agentsolwallet/cli@latest config set rpc.url https://your-rpc-endpoint.com
+npx @agentsolwallet/cli@latest wallet create --name my-wallet
 ```
 
-If the user has installed globally (`npm install -g @solana-compass/cli`),
+If the user has installed globally (`npm install -g @agentsolwallet/cli`),
 you can use the shorter `sol` command instead:
 
 ```bash

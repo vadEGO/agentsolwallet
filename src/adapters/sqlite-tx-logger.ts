@@ -1,4 +1,4 @@
-import type { TransactionLogger, TxLogEntry } from '@solana-compass/sdk';
+import type { TransactionLogger, TxLogEntry } from '@agentsolwallet/sdk';
 import { logTransaction, updateTransactionStatus } from '../core/transaction.js';
 
 export class SqliteTxLogger implements TransactionLogger {

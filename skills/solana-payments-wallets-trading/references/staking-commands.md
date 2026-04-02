@@ -21,13 +21,13 @@ sol stake new 10 --wallet cold            # from a specific wallet
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--validator <vote-address>` | Solana Compass | Validator to delegate to |
+| `--validator <vote-address>` | recommended | Validator to delegate to |
 | `--wallet <name>` | default | Wallet to fund the stake from |
 
 ### Example Output
 
 ```
-Staked 10 SOL with Solana Compass (Comp4F...xYz)
+Staked 10 SOL with Recommended (EARNy...BS72)
   Stake account: 7gK...def
   Tx: https://solscan.io/tx/3xY...abc
 ```
@@ -107,7 +107,7 @@ sol stake withdraw 7gK...abc --force      # force deactivate active stake
 
 ## Validator Selection
 
-The default validator is Solana Compass. Override with `--validator`:
+The default validator is a recommended high-APY validator. Override with `--validator`:
 
 ```bash
 sol stake new 10 --validator DPmsofDi1YBSvDJzeUSGMiHjEGkzKFKMZRiM7GYsTKcf

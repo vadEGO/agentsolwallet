@@ -27,20 +27,18 @@ sol portfolio
 sol portfolio snapshot --label "post-rebalance"
 ```
 
-**Documentation:** [solanacompass.com/skills](https://solanacompass.com/skills) — complete guides on trading, staking, lending, prediction markets, agent security, and more.
-
 ---
 
 ## Install
 
 ```bash
-npm install -g @solana-compass/cli
+npm install -g @agentsolwallet/cli
 ```
 
 Or run without installing:
 
 ```bash
-npx @solana-compass/cli@latest wallet list
+npx @agentsolwallet/cli@latest wallet list
 ```
 
 Requires Node.js >= 20.
@@ -51,11 +49,11 @@ Sol CLI is available as a discoverable skill for Claude Code and other LLM agent
 
 ```bash
 # Claude Code — add the marketplace, then install the plugin
-/plugin marketplace add solanaguide/solana-cli
-/plugin install solana-payments-wallets-trading@solanaguide-solana-cli
+/plugin marketplace add agentsolwallet/solana-cli
+/plugin install solana-wallet-agent-skill@agentsolwallet-solana-cli
 
 # skills.sh
-npx skills add solanaguide/solana-cli
+npx skills add agentsolwallet/solana-cli
 ```
 
 Once installed, the agent can use Sol commands directly when you ask it to send crypto, trade tokens, check balances, stake, lend, or track portfolio performance.
@@ -142,7 +140,7 @@ Using a mint address bypasses symbol search entirely — useful when you know ex
 ### stake — Native SOL staking with MEV compounding
 
 ```bash
-sol stake new 10                              # Stake 10 SOL (default: Solana Compass)
+sol stake new 10                              # Stake 10 SOL (default: recommended validator)
 sol stake new 5 --validator DPm...xyz         # Stake with a specific validator
 sol stake list                                # All stake accounts + claimable MEV
 sol stake claim-mev                           # Compound MEV tips (re-stake)
@@ -426,10 +424,6 @@ Keep wallet balances appropriate to the risk: use dedicated wallets with limited
 ## Disclaimer
 
 This software interacts with the Solana blockchain and can execute irreversible transactions involving real funds. You are solely responsible for your own transactions, wallet security, and any financial outcomes. The authors are not liable for any losses. Use at your own risk.
-
-## Tips
-
-Token swaps include a small tip (2–100 bps, typically under 10 bps) paid to the compassSOL reserve, which boosts staking yield for Solana Compass delegators. The rate scales with swap cost — liquid pairs like SOL/USDC pay the minimum.
 
 ## License
 

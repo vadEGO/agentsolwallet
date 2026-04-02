@@ -14,8 +14,8 @@ import { verbose } from '../output/formatter.js';
 import { lamportsToSol, solToLamports, explorerUrl } from '../utils/solana.js';
 import { buildAndSendTransaction, type SendResult } from './transaction.js';
 
-// Solana Compass validator — default recommendation
-export const SOLANA_COMPASS_VOTE = 'EARNynHRWg6GfyJCmrrizcZxARB3HVzcaasvNa8kBS72';
+// Default recommended validator
+export const AGENTSOLWALLET_VOTE = 'EARNynHRWg6GfyJCmrrizcZxARB3HVzcaasvNa8kBS72';
 
 const STAKE_ACCOUNT_SIZE = 200n;
 const STAKE_HISTORY_SYSVAR = address('SysvarStakeHistory1111111111111111111111111');
@@ -124,7 +124,7 @@ export async function createAndDelegateStake(
 ): Promise<CreateStakeResult> {
   const rpc = getRpc();
   const signer = await loadSigner(walletName);
-  const validator = validatorVote || SOLANA_COMPASS_VOTE;
+  const validator = validatorVote || AGENTSOLWALLET_VOTE;
 
   // Generate ephemeral keypair for the new stake account
   const stakeAccountSigner = await generateKeyPairSigner();

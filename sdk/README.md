@@ -1,11 +1,11 @@
-# @solana-compass/sdk
+# @agentsolwallet/sdk
 
 Solana SDK for building apps with Jupiter, Kamino, MarginFi, Drift, Loopscale, and more. Extracted from the [Sol CLI](https://github.com/SolanaGuide/solana-cli) so websites, bots, and other consumers can reuse the same integrations without dragging in Commander, SQLite, or filesystem dependencies.
 
 ## Install
 
 ```bash
-npm install @solana-compass/sdk @solana/kit
+npm install @agentsolwallet/sdk @solana/kit
 ```
 
 Optional peer dependencies for DeFi protocol support:
@@ -26,7 +26,7 @@ If these aren't installed, those providers are silently skipped.
 ## Quick Start
 
 ```ts
-import { createSolSdk, registerDefaultProviders, InMemoryConfig } from '@solana-compass/sdk';
+import { createSolSdk, registerDefaultProviders, InMemoryConfig } from '@agentsolwallet/sdk';
 import { createSolanaRpc } from '@solana/kit';
 
 const rpc = createSolanaRpc('https://api.mainnet-beta.solana.com');
@@ -72,7 +72,7 @@ Your App                              Sol CLI
            │                └──────────┬───────────────┘
            ▼                           ▼
     ┌─────────────────────────────────────┐
-    │  @solana-compass/sdk                │
+    │  @agentsolwallet/sdk              │
     │  createSolSdk(opts) → SolSdk        │
     │  price, swap, stake, lend, earn,    │
     │  orders, predict, portfolio, x402   │
@@ -226,7 +226,7 @@ import {
   NoopTransactionLogger,   // log/updateStatus are no-ops
   InMemoryConfig,          // wraps a plain object, dot-notation get
   InMemoryCache,           // Map-based price + token cache
-} from '@solana-compass/sdk';
+} from '@agentsolwallet/sdk';
 
 // Pass a config object with dot-separated keys
 const config = new InMemoryConfig({
@@ -250,7 +250,7 @@ sdk.price.getCachedPrice(mint: string): PriceResult | undefined
 Fetches USD prices via Jupiter Price API with CoinGecko fallback. Results are cached.
 
 ```ts
-import { SOL_MINT } from '@solana-compass/sdk';
+import { SOL_MINT } from '@agentsolwallet/sdk';
 
 const prices = await sdk.price.getPrices([SOL_MINT]);
 const solPrice = prices.get(SOL_MINT);
@@ -343,7 +343,7 @@ sdk.stake.getStakeAccounts(walletAddress: string): Promise<StakeAccountInfo[]>
 sdk.stake.createAndDelegateStake(
   walletName: string,
   amountSol: number,
-  validatorVote?: string,        // defaults to Solana Compass
+  validatorVote?: string,        // defaults to recommended validator
 ): Promise<CreateStakeResult>
 
 sdk.stake.withdrawStake(
@@ -526,7 +526,7 @@ interface SendResult {
 Also exported as standalone utilities:
 
 ```ts
-import { classifyError, ErrorClass, injectSigners } from '@solana-compass/sdk';
+import { classifyError, ErrorClass, injectSigners } from '@agentsolwallet/sdk';
 
 classifyError(err); // ErrorClass.RETRYABLE_TRANSIENT | TERMINAL_PROGRAM | etc.
 injectSigners(instructions, [signer]); // attach signers to instruction accounts
@@ -552,7 +552,7 @@ import {
   withRetry, RateLimiter, isRetryableHttpError,
 
   // Constants
-  SOLANA_COMPASS_VOTE,
+  AGENTSOLWALLET_VOTE,
   PROTOCOL_NAMES,         // lend protocol names
   EARN_PROTOCOL_NAMES,    // earn protocol names
   PREDICT_CATEGORIES,     // prediction market categories
@@ -562,7 +562,7 @@ import {
   getKaminoRpc, kAddress, kSigner, getCurrentSlot,
   getMarginFiV1Connection, MarginFiDummyWallet,
   getDriftV1Connection, DriftDummyWallet,
-} from '@solana-compass/sdk';
+} from '@agentsolwallet/sdk';
 ```
 
 ## API Proxy Support
@@ -588,7 +588,7 @@ When a base URL is set, all API calls for that service go through your proxy. Yo
 Register your own lend, earn, or predict providers:
 
 ```ts
-import type { LendProvider, EarnProvider, PredictProvider } from '@solana-compass/sdk';
+import type { LendProvider, EarnProvider, PredictProvider } from '@agentsolwallet/sdk';
 
 class MyLendProvider implements LendProvider {
   name = 'my-protocol';

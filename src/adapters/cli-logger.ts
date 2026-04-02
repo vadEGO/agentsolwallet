@@ -1,4 +1,4 @@
-import type { Logger } from '@solana-compass/sdk';
+import type { Logger } from '@agentsolwallet/sdk';
 import { verbose, warn } from '../output/formatter.js';
 
 export class CliLogger implements Logger {

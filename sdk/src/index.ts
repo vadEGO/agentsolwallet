@@ -34,7 +34,7 @@ export type { SwapService, SwapQuote, SwapResult } from './services/swap-service
 export type { SwapRouter, SwapQuoteRequest, SwapQuoteResult } from './services/swap/swap-router.js';
 
 // ── Stake service ────────────────────────────────────────────
-export { SOLANA_COMPASS_VOTE } from './services/stake-service.js';
+export { AGENTSOLWALLET_VOTE } from './services/stake-service.js';
 export type { StakeService, StakeAccountInfo, CreateStakeResult, WithdrawStakeResult, ClaimMevResult } from './services/stake-service.js';
 
 // ── Lend service ─────────────────────────────────────────────

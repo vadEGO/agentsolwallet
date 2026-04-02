@@ -1,4 +1,4 @@
-import { createSolSdk, registerDefaultProviders, createNoopInstruction, type SolSdk } from '@solana-compass/sdk';
+import { createSolSdk, registerDefaultProviders, createNoopInstruction, type SolSdk } from '@agentsolwallet/sdk';
 import { getRpc, getRpcUrl } from './core/rpc.js';
 import { CliLogger } from './adapters/cli-logger.js';
 import { TomlConfig } from './adapters/toml-config.js';

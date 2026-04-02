@@ -1,4 +1,4 @@
-import type { ConfigProvider } from '@solana-compass/sdk';
+import type { ConfigProvider } from '@agentsolwallet/sdk';
 import { getConfigValue } from '../core/config-manager.js';
 
 export class TomlConfig implements ConfigProvider {

@@ -1,7 +1,7 @@
 import type {
   CacheProvider, PriceCacheEntry, TokenCacheEntry, TokenUpsert,
   TokenListCacheRow, SnapshotRow, SnapshotEntryRow,
-} from '@solana-compass/sdk';
+} from '@agentsolwallet/sdk';
 import * as priceRepo from '../db/repos/price-repo.js';
 import * as tokenRepo from '../db/repos/token-repo.js';
 import * as tokenListRepo from '../db/repos/token-list-repo.js';

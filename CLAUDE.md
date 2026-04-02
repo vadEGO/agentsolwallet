@@ -19,7 +19,7 @@ After output, tell the user what they can do next. `stake list` reminds about cl
 Implement functionality directly via RPC and on-chain programs. Don't require API keys for core features. The Jupiter API is acceptable for swaps (it's free, keyless), but core operations like staking, transfers, and token info should work with just an RPC endpoint.
 
 ### Smart defaults, easy overrides
-Default validator is Solana Compass. Default wallet is the first one created. Default slippage is 50 bps. Default router is `best`. All overridable with flags. A new user should be able to `sol wallet create && sol stake new 10` without configuring anything beyond an RPC.
+Default wallet is the first one created. Default slippage is 50 bps. Default router is `best`. All overridable with flags. A new user should be able to `sol wallet create && sol stake new 10` without configuring anything beyond an RPC.
 
 ## Architecture
 
@@ -41,7 +41,7 @@ One-time setup:
 npm run setup        # installs deps + npm-links 'sol' to this repo
 ```
 
-After linking, `sol <cmd>` always runs live TypeScript source — no build step needed. The `bin/sol.mjs` shim detects `src/index.ts` and spawns tsx with `tsconfig.dev.json`, which maps `@solana-compass/sdk` to `sdk/src/` for live SDK resolution.
+After linking, `sol <cmd>` always runs live TypeScript source — no build step needed. The `bin/sol.mjs` shim detects `src/index.ts` and spawns tsx with `tsconfig.dev.json`, which maps `@agentsolwallet/sdk` to `sdk/src/` for live SDK resolution.
 
 Builds are only needed for publishing:
 ```bash
@@ -64,8 +64,8 @@ npm run publish:all  # runs publish:sdk then npm publish
 
 Or individually:
 ```bash
-npm run publish:sdk  # @solana-compass/sdk only
-npm publish --access public  # @solana-compass/cli only
+npm run publish:sdk  # @agentsolwallet/sdk only
+npm publish --access public  # @agentsolwallet/cli only
 ```
 
 ## Code Conventions
@@ -194,7 +194,7 @@ Snapshots capture portfolio state at a point in time. The `snapshot_entries` tab
 The CLI is published as a discoverable agent skill via three channels:
 
 - **Claude Code plugin** — `.claude-plugin/marketplace.json` + `plugin.json` at repo root. Auto-discovered from GitHub.
-- **skills.sh** — `skills/solana-payments-wallets-trading/SKILL.md` + `references/`. Discovered via npm package.
+- **skills.sh** — `skills/solana-wallet-agent-skill/SKILL.md` + `references/`. Discovered via npm package.
 - **ClawdHub** — same skill directory, published separately.
 
 ### Versioning
@@ -204,13 +204,13 @@ When bumping the version, update ALL of these in sync:
 2. `sdk/package.json` → `version`
 3. `.claude-plugin/plugin.json` → `version`
 4. `.claude-plugin/marketplace.json` → `plugins[0].version`
-5. `skills/solana-payments-wallets-trading/SKILL.md` → frontmatter `version`
+5. `skills/solana-wallet-agent-skill/SKILL.md` → frontmatter `version`
 
 `src/index.ts` reads the version from `package.json` dynamically — no manual sync needed there.
 
-**Plugin users** get updates when they run `/plugin marketplace update solanaguide-solana-cli` or enable auto-update (disabled by default for third-party marketplaces). If you don't bump the version, the update is skipped — Claude Code treats same-version as unchanged.
+**Plugin users** get updates when they run `/plugin marketplace update agentsolwallet-solana-cli` or enable auto-update (disabled by default for third-party marketplaces). If you don't bump the version, the update is skipped — Claude Code treats same-version as unchanged.
 
-**skills.sh users** get updates when they re-run `npx skills add solanaguide/solana-cli` (pulls latest from npm). There's no global update command.
+**skills.sh users** get updates when they re-run `npx skills add agentsolwallet/solana-cli` (pulls latest from npm). There's no global update command.
 
 Always `npm publish` after pushing so both channels are in sync.
 

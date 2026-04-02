@@ -7,10 +7,8 @@ import {
   decompileTransactionMessageFetchingLookupTables,
   appendTransactionMessageInstructions,
   signTransactionMessageWithSigners,
-  address,
 } from '@solana/kit';
-import { getTransferSolInstruction } from '@solana-program/system';
-import { uiToTokenAmount, SOL_MINT } from '../utils/solana.js';
+import { uiToTokenAmount } from '../utils/solana.js';
 import type { SolContext } from '../types.js';
 import type { SwapRouter, SwapQuoteRequest, SwapQuoteResult } from './swap/swap-router.js';
 import type { PriceService } from './price-service.js';
@@ -18,16 +16,6 @@ import type { TokenRegistryService } from './token-registry-service.js';
 import type { TransactionService } from './transaction-service.js';
 import { createJupiterRouter } from './swap/jupiter-router.js';
 import { createDFlowRouter } from './swap/dflow-router.js';
-
-const COMPASS_RESERVE = address('8H2xjMT543YWBLRjJ24BrQyBgFuQRU6MgENA3mqXoh7y');
-const MIN_REWARD_BPS = 2;
-const MAX_REWARD_BPS = 100;
-const REWARD_CURVE_K = 0.7;
-
-function rewardBpsFromCost(effectiveCostPct: number): number {
-  const t = 1 - Math.exp(-REWARD_CURVE_K * Math.abs(effectiveCostPct));
-  return Math.round(MIN_REWARD_BPS + (MAX_REWARD_BPS - MIN_REWARD_BPS) * t);
-}
 
 export interface SwapQuote {
   inputMint: string;
@@ -183,44 +171,13 @@ export function createSwapService(
     outputSymbol: string,
     amount: number,
     walletName: string,
-    opts: { slippageBps?: number; skipPreflight?: boolean; rewardBps?: number; router?: string } = {}
+    opts: { slippageBps?: number; skipPreflight?: boolean; router?: string } = {}
   ): Promise<SwapResult> {
     const quote = await getQuote(inputSymbol, outputSymbol, amount, {
       slippageBps: opts.slippageBps,
       router: opts.router,
     });
     const signer = await ctx.signer.getSigner(walletName);
-
-    let fromPriceUsd: number | undefined;
-    let toPriceUsd: number | undefined;
-    try {
-      const prices = await deps.price.getPrices([quote.inputMint, quote.outputMint]);
-      fromPriceUsd = prices.get(quote.inputMint)?.priceUsd;
-      toPriceUsd = prices.get(quote.outputMint)?.priceUsd;
-    } catch {
-      logger.verbose('Could not fetch prices');
-    }
-
-    const inputIsSol = quote.inputMint === SOL_MINT;
-    const outputIsSol = quote.outputMint === SOL_MINT;
-    let rewardBps: number;
-    if (opts.rewardBps != null) {
-      rewardBps = opts.rewardBps;
-    } else if (fromPriceUsd && toPriceUsd && fromPriceUsd > 0) {
-      const inputUsd = quote.inputUiAmount * fromPriceUsd;
-      const outputUsd = quote.outputUiAmount * toPriceUsd;
-      const effectiveCostPct = (1 - outputUsd / inputUsd) * 100;
-      rewardBps = rewardBpsFromCost(effectiveCostPct);
-    } else {
-      rewardBps = MIN_REWARD_BPS;
-    }
-
-    let contributionLamports = 0n;
-    if (inputIsSol) {
-      contributionLamports = BigInt(quote.inputAmount) * BigInt(rewardBps) / 10000n;
-    } else if (outputIsSol) {
-      contributionLamports = BigInt(quote.outputAmount) * BigInt(rewardBps) / 10000n;
-    }
 
     // Get swap transaction from the router that produced the quote
     const router = routers.get(quote._routerName);
@@ -233,17 +190,6 @@ export function createSwapService(
     const rawTx = getTransactionDecoder().decode(txBytes);
     const compiledMsg = getCompiledTransactionMessageDecoder().decode(rawTx.messageBytes);
     let msg = await decompileTransactionMessageFetchingLookupTables(compiledMsg, rpc);
-
-    // Append SOL transfer to reserve if applicable
-    if (contributionLamports > 0n) {
-      logger.verbose(`Appending ${contributionLamports} lamport contribution to reserve`);
-      const transferIx = getTransferSolInstruction({
-        source: signer,
-        destination: COMPASS_RESERVE,
-        amount: contributionLamports,
-      });
-      msg = appendTransactionMessageInstructions([transferIx], msg) as typeof msg;
-    }
 
     // Append analytics instruction if configured
     const analyticsIx = ctx.analyticsInstruction?.();
@@ -265,8 +211,6 @@ export function createSwapService(
       toMint: quote.outputMint,
       fromAmount: quote.inputAmount,
       toAmount: quote.outputAmount,
-      fromPriceUsd,
-      toPriceUsd,
     });
 
     return {

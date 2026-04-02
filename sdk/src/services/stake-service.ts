@@ -12,7 +12,7 @@ import { lamportsToSol, solToLamports, explorerUrl } from '../utils/solana.js';
 import type { SolContext, SendResult } from '../types.js';
 import type { TransactionService } from './transaction-service.js';
 
-export const SOLANA_COMPASS_VOTE = 'EARNynHRWg6GfyJCmrrizcZxARB3HVzcaasvNa8kBS72';
+export const AGENTSOLWALLET_VOTE = 'EARNynHRWg6GfyJCmrrizcZxARB3HVzcaasvNa8kBS72';
 
 const STAKE_ACCOUNT_SIZE = 200n;
 const STAKE_HISTORY_SYSVAR = address('SysvarStakeHistory1111111111111111111111111');
@@ -128,7 +128,7 @@ export function createStakeService(ctx: SolContext, tx: TransactionService): Sta
     opts?: { fromPriceUsd?: number },
   ): Promise<CreateStakeResult> {
     const payer = await signer.getSigner(walletName);
-    const validator = validatorVote || SOLANA_COMPASS_VOTE;
+    const validator = validatorVote || AGENTSOLWALLET_VOTE;
 
     const stakeAccountSigner = await generateKeyPairSigner();
 

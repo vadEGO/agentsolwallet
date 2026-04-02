@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { getRpc } from '../core/rpc.js';
-import { SOLANA_COMPASS_VOTE } from '@solana-compass/sdk';
+import { AGENTSOLWALLET_VOTE } from '@agentsolwallet/sdk';
 import { output, success, failure, isJsonMode, timed, verbose } from '../output/formatter.js';
 import { withRetry, isRetryableHttpError } from '../utils/retry.js';
 
@@ -22,7 +22,7 @@ interface NetworkStatus {
   inflationValidator: number | null;
   inflationFoundation: number | null;
   stakingApy: number | null;
-  compassApy: number | null;
+  recommendedApy: number | null;
 }
 
 export function registerNetworkCommand(program: Command): void {
@@ -62,14 +62,14 @@ export function registerNetworkCommand(program: Command): void {
 
           // Fetch staking APY from StakeWiz (non-critical)
           let stakingApy: number | null = null;
-          let compassApy: number | null = null;
+          let recommendedApy: number | null = null;
           try {
             const [clusterApy, validatorApy] = await Promise.all([
               fetchStakingApy(),
-              fetchValidatorApy(SOLANA_COMPASS_VOTE),
+              fetchValidatorApy(AGENTSOLWALLET_VOTE),
             ]);
             stakingApy = clusterApy;
-            compassApy = validatorApy;
+            recommendedApy = validatorApy;
           } catch (err) {
             verbose(`StakeWiz API failed: ${err}`);
           }
@@ -103,7 +103,7 @@ export function registerNetworkCommand(program: Command): void {
             inflationValidator: inflationRate ? inflationRate.validator * 100 : null,
             inflationFoundation: inflationRate ? inflationRate.foundation * 100 : null,
             stakingApy,
-            compassApy,
+            recommendedApy,
           };
 
           return status;
@@ -127,7 +127,7 @@ Slot         ${data.absoluteSlot}
 TPS          ${data.tps !== null ? `~${data.tps.toLocaleString()}` : 'unavailable'}
 Version      ${data.version ?? 'unavailable'}
 Inflation    ${data.inflationTotal !== null ? `${data.inflationTotal.toFixed(2)}%` : 'unavailable'}
-Staking APY  ${data.stakingApy !== null ? `~${data.stakingApy.toFixed(2)}% (network average)` : 'unavailable'}${data.compassApy !== null ? `\nCompass APY  ~${data.compassApy.toFixed(2)}% (incl. MEV)` : ''}
+Staking APY  ${data.stakingApy !== null ? `~${data.stakingApy.toFixed(2)}% (network average)` : 'unavailable'}${data.recommendedApy !== null ? `\nRecommended APY  ~${data.recommendedApy.toFixed(2)}% (incl. MEV)` : ''}
 `);
         }
       } catch (err: any) {

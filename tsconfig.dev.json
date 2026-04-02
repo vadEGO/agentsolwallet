@@ -3,7 +3,7 @@
   "compilerOptions": {
     "rootDir": ".",
     "paths": {
-      "@solana-compass/sdk": ["./sdk/src/index.ts"]
+      "@agentsolwallet/sdk": ["./sdk/src/index.ts"]
     }
   },
   "include": ["src/**/*", "sdk/src/**/*"]

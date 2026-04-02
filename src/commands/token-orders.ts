@@ -1,6 +1,6 @@
 import { type Command } from 'commander';
 import { getSdk } from '../sdk-init.js';
-import { parseInterval } from '@solana-compass/sdk';
+import { parseInterval } from '@agentsolwallet/sdk';
 import { getDefaultWalletName, resolveWalletName } from '../core/wallet-manager.js';
 import { output, success, failure, isJsonMode, timed, fmtPrice } from '../output/formatter.js';
 import { table } from '../output/table.js';

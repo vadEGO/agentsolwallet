@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { ensureProviders } from '../sdk-init.js';
-import { LP_PROTOCOL_NAMES } from '@solana-compass/sdk';
+import { LP_PROTOCOL_NAMES } from '@agentsolwallet/sdk';
 import { getDefaultWalletName, resolveWalletName } from '../core/wallet-manager.js';
 import { isPermitted } from '../core/config-manager.js';
 import { output, success, failure, isJsonMode, timed } from '../output/formatter.js';
