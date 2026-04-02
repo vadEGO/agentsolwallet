@@ -43,14 +43,15 @@ interface OrcaApiPoolV2 {
   tokenA: { address: string; symbol: string; decimals: number; name: string };
   tokenB: { address: string; symbol: string; decimals: number; name: string };
   tickSpacing: number;
-  price: number;
+  price: string;  // v2 API returns strings for numeric fields
   feeRate: number;
-  tvlUsdc: number;
-  volume24hUsdc: number;
-  yield24hUsdc: number;
-  totalApr24h: number;
-  feeApr24h: number;
-  rewardApr24h: number;
+  tvlUsdc: string;  // v2 API returns string
+  stats?: {
+    '24h'?: {
+      volume?: string;
+      yieldOverTvl?: string;
+    };
+  };
 }
 
 // ── Dependency bundle ───────────────────────────────────────
@@ -112,11 +113,11 @@ export class OrcaLpProvider implements LpProvider {
       tokenB: p.tokenB.symbol,
       mintA: p.tokenA.address,
       mintB: p.tokenB.address,
-      tvlUsd: p.tvlUsdc || null,
-      volume24hUsd: p.volume24hUsdc || null,
+      tvlUsd: parseFloat(p.tvlUsdc ?? '0') || null,
+      volume24hUsd: parseFloat(p.stats?.['24h']?.volume ?? '0') || null,
       feeRate: p.feeRate,
-      apy: p.totalApr24h || null,
-      currentPrice: p.price,
+      apy: parseFloat(p.stats?.['24h']?.yieldOverTvl ?? '0') || null,
+      currentPrice: parseFloat(p.price ?? '0') || 0,
       tickSpacing: p.tickSpacing,
     };
   }
@@ -155,7 +156,9 @@ export class OrcaLpProvider implements LpProvider {
       const resp = await fetch(url);
       if (!resp.ok) throw new Error(`Orca API error ${resp.status}`);
 
-      const data: OrcaApiPoolV2[] = await resp.json();
+      const json = await resp.json();
+      // v2 API wraps response in { data: [...], meta: {...} }
+      const data: OrcaApiPoolV2[] = json.data ?? json;
 
       const results = data.map(p => this.mapOrcaPool(p));
       results.sort((a, b) => (b.tvlUsd ?? 0) - (a.tvlUsd ?? 0));

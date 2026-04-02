@@ -478,11 +478,29 @@ export class KaminoLpProvider implements LpProvider {
 
     const [symbolA, symbolB] = await this.resolveTokenPair(mintA, mintB);
 
-    // Get share data for current price and range
-    const shareData = await kamino.getStrategyShareData(kAddress(strategyAddress));
-    const currentPrice: number = (shareData.balance.prices as any).poolPrice.toNumber();
-    const lowerPrice: number = (shareData.balance.prices as any).lowerPrice.toNumber();
-    const upperPrice: number = (shareData.balance.prices as any).upperPrice.toNumber();
+    // Get share data for current price and range, with API fallback for Scope oracle issues
+    let shareData: any;
+    let currentPrice: number;
+    let lowerPrice: number;
+    let upperPrice: number;
+    try {
+      shareData = await kamino.getStrategyShareData(kAddress(strategyAddress));
+      currentPrice = (shareData.balance.prices as any).poolPrice.toNumber();
+      lowerPrice = (shareData.balance.prices as any).lowerPrice.toNumber();
+      upperPrice = (shareData.balance.prices as any).upperPrice.toNumber();
+    } catch (err: any) {
+      if (err.message?.includes('RewardScopePriceAccountNotPresent')) {
+        this.ctx.logger.verbose('Scope oracle unavailable, using API fallback for pricing');
+        // Use cached API data for pricing
+        const apiStrat = apiCache.find(s => s.address === strategyAddress);
+        if (!apiStrat) throw new Error(`Strategy ${strategyAddress} not found in API cache`);
+        currentPrice = apiStrat.currentPrice;
+        lowerPrice = apiStrat.lowerPrice;
+        upperPrice = apiStrat.upperPrice;
+      } else {
+        throw err;
+      }
+    }
 
     // Determine deposit amounts
     let amountA = 0;

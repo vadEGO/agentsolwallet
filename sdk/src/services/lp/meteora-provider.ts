@@ -180,31 +180,17 @@ export class MeteoraLpProvider implements LpProvider {
       return dlmmPairCache;
     }
 
-    this.ctx.logger.verbose('Fetching Meteora DLMM pairs from API...');
-    const resp = await fetch(DLMM_PAIRS_API);
-    if (!resp.ok) throw new Error(`Meteora DLMM API error ${resp.status}`);
-
-    const data: any[] = await resp.json();
-    dlmmPairCache = this.parseDlmmPairs(data);
+    this.ctx.logger.verbose('Meteora DLMM REST API is deprecated, returning empty pool list');
+    this.ctx.logger.verbose('Use individual pool addresses with `sol lp deposit <poolId>` for DLMM pools');
+    dlmmPairCache = [];
     dlmmPairCacheTs = Date.now();
     return dlmmPairCache;
   }
 
   private async fetchDlmmPairsFiltered(tokenMint: string): Promise<CachedDlmmPair[]> {
-    this.ctx.logger.verbose(`Fetching Meteora DLMM pairs for token ${tokenMint.slice(0, 8)}...`);
-    try {
-      const url = `${DLMM_PAIRS_SEARCH_API}?search_term=${tokenMint}&page=0&limit=100&sort_key=liquidity&order_by=desc`;
-      const resp = await fetch(url);
-      if (!resp.ok) {
-        this.ctx.logger.verbose(`DLMM search API error ${resp.status}, falling back to full list`);
-        return this.fetchDlmmPairs();
-      }
-      const result: any = await resp.json();
-      const data: any[] = result.pairs ?? result.data ?? result;
-      return this.parseDlmmPairs(Array.isArray(data) ? data : []);
-    } catch {
-      return this.fetchDlmmPairs();
-    }
+    // REST API is deprecated, return empty
+    this.ctx.logger.verbose('Meteora DLMM REST API is deprecated');
+    return [];
   }
 
   private parseDlmmPairs(data: any[]): CachedDlmmPair[] {
