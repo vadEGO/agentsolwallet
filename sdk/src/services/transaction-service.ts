@@ -247,7 +247,18 @@ export function createTransactionService(ctx: SolContext): TransactionService {
     const signature = await rpc.sendTransaction(encodedTx as any, {
       skipPreflight: opts.skipPreflight ?? false,
       encoding: 'base64',
-    }).send();
+    }).send().catch(err => {
+      logger.verbose(`sendTransaction failed: ${err}`);
+      const errCtx = (err as any)?.context;
+      if (errCtx?.logs?.length) {
+        logger.verbose('Transaction logs:');
+        for (const log of errCtx.logs) logger.verbose(`  ${log}`);
+      }
+      if (errCtx?.error) {
+        logger.verbose(`Context error: ${JSON.stringify(errCtx.error)}`);
+      }
+      throw err;
+    });
 
     const sigStr = String(signature);
 

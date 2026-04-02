@@ -1,3 +1,5 @@
+import { uiToTokenAmount } from '../utils/solana.js';
+import { Transaction, VersionedTransaction } from '@solana/web3.js';
 import {
   getTransactionDecoder,
   getBase64EncodedWireTransaction,
@@ -7,9 +9,13 @@ import {
   decompileTransactionMessageFetchingLookupTables,
   appendTransactionMessageInstructions,
   signTransactionMessageWithSigners,
+  setTransactionMessageFeePayer,
+  createTransactionMessage,
+  setTransactionMessageLifetimeUsingBlockhash,
 } from '@solana/kit';
-import { uiToTokenAmount } from '../utils/solana.js';
+import { pipe } from '@solana/functional';
 import type { SolContext } from '../types.js';
+import type { Instruction, TransactionSigner } from '@solana/kit';
 import type { SwapRouter, SwapQuoteRequest, SwapQuoteResult } from './swap/swap-router.js';
 import type { PriceService } from './price-service.js';
 import type { TokenRegistryService } from './token-registry-service.js';
@@ -60,6 +66,23 @@ export interface SwapService {
     walletName: string,
     opts?: { slippageBps?: number; skipPreflight?: boolean; rewardBps?: number; router?: string },
   ): Promise<SwapResult>;
+}
+
+// Inject TransactionSigner references into instruction accounts that match known signers.
+function injectSigners(
+  instructions: Instruction[],
+  signers: TransactionSigner[],
+): Instruction[] {
+  const signerMap = new Map(signers.map(s => [s.address, s]));
+  return instructions.map(ix => ({
+    ...ix,
+    accounts: (ix.accounts ?? []).map((acc: any) => {
+      if ((acc.role === 2 || acc.role === 3) && signerMap.has(acc.address) && !acc.signer) {
+        return { ...acc, signer: signerMap.get(acc.address)! };
+      }
+      return acc;
+    }),
+  }));
 }
 
 export function createSwapService(
@@ -185,24 +208,25 @@ export function createSwapService(
 
     const swapTxBase64 = await router.getSwapTransaction(quote._raw as any, signer.address);
 
-    // Decode and decompile the transaction
-    const txBytes = new Uint8Array(Buffer.from(swapTxBase64, 'base64'));
-    const rawTx = getTransactionDecoder().decode(txBytes);
-    const compiledMsg = getCompiledTransactionMessageDecoder().decode(rawTx.messageBytes);
-    let msg = await decompileTransactionMessageFetchingLookupTables(compiledMsg, rpc);
-
-    // Append analytics instruction if configured
-    const analyticsIx = ctx.analyticsInstruction?.();
-    if (analyticsIx) {
-      msg = appendTransactionMessageInstructions([analyticsIx], msg) as typeof msg;
-    }
-
-    // Sign and encode
-    logger.verbose('Signing swap transaction...');
-    const signedTx = await signTransactionMessageWithSigners(msg);
-    const encodedTx = getBase64EncodedWireTransaction(signedTx);
+    // Use web3.js to sign to avoid v2 kit signer mapping issues
+    logger.verbose('Signing swap with web3.js...');
+    const tx = VersionedTransaction.deserialize(Buffer.from(swapTxBase64, 'base64'));
+    
+    // Get raw keypair bytes from the signer provider
+    const rawBytes = ctx.signer.getRawBytes?.(walletName);
+    if (!rawBytes) throw new Error('Signer provider does not expose raw keypair bytes');
+    
+    const { Keypair } = await import('@solana/web3.js');
+    const keypair = Keypair.fromSecretKey(rawBytes);
+    
+    // Sign the transaction
+    tx.sign([keypair]);
+    
+    // Encode back to base64
+    const encodedTx = Buffer.from(tx.serialize()).toString('base64');
 
     // Send, confirm, and log
+    logger.verbose('Sending signed transaction...');
     const result = await deps.tx.sendEncodedTransaction(encodedTx, {
       skipPreflight: opts.skipPreflight,
       txType: 'swap',

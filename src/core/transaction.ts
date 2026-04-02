@@ -222,6 +222,11 @@ export async function buildAndSendTransaction(
         verbose('Transaction logs:');
         for (const log of ctx.logs) verbose(`  ${log}`);
       }
+      
+      // Also check for instruction errors in the context
+      if (ctx?.error) {
+        verbose(`Context error: ${JSON.stringify(ctx.error)}`);
+      }
 
       if (lastSignature) {
         updateTransactionStatus(lastSignature, 'failed', String(err));
@@ -262,7 +267,18 @@ export async function sendEncodedTransaction(
   const signature = await rpc.sendTransaction(encodedTx as any, {
     skipPreflight: opts.skipPreflight ?? false,
     encoding: 'base64',
-  }).send();
+  }).send().catch(err => {
+    verbose(`sendTransaction failed: ${err}`);
+    const ctx = (err as any)?.context;
+    if (ctx?.logs?.length) {
+      verbose('Transaction logs:');
+      for (const log of ctx.logs) verbose(`  ${log}`);
+    }
+    if (ctx?.error) {
+      verbose(`Context error: ${JSON.stringify(ctx.error)}`);
+    }
+    throw err;
+  });
 
   const sigStr = String(signature);
 

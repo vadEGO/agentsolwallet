@@ -173,8 +173,10 @@ export class KaminoLpProvider implements LpProvider {
     try {
       const kamino = this.getKamino();
       const pks = await kamino.getMainLookupTablePks();
+      this.ctx.logger.verbose(`Kamino lookup tables: ${pks.length} tables found`);
       return pks.map((pk: any) => address(String(pk)));
-    } catch {
+    } catch (err) {
+      this.ctx.logger.verbose(`Kamino getMainLookupTablePks failed: ${err}`);
       return [];
     }
   }

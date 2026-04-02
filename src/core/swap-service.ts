@@ -1,22 +1,13 @@
 import { verbose } from '../output/formatter.js';
 import { resolveToken } from './token-registry.js';
 import { uiToTokenAmount } from '../utils/solana.js';
-import { loadSigner } from './wallet-manager.js';
-import {
-  getTransactionDecoder,
-  getBase64EncodedWireTransaction,
-} from '@solana/transactions';
-import {
-  getCompiledTransactionMessageDecoder,
-  decompileTransactionMessageFetchingLookupTables,
-  appendTransactionMessageInstructions,
-  signTransactionMessageWithSigners,
-} from '@solana/kit';
-
-import { sendEncodedTransaction } from './transaction.js';
-import { createNoopInstruction } from '../utils/noop.js';
-import { getRouterQuote, getRouter } from './swap-router.js';
+import { loadSigner, loadSignerRawBytes } from './wallet-manager.js';
 import { getRpc } from './rpc.js';
+import { getRouterQuote, getRouter } from './swap-router.js';
+import { sendEncodedTransaction } from './transaction.js';
+import { getBase64EncodedWireTransaction } from '@solana/transactions';
+import { Transaction, VersionedTransaction } from '@solana/web3.js';
+import { createKeyPairSignerFromBytes } from '@solana/kit';
 
 // Import routers so they self-register
 import './jupiter-router.js';
@@ -105,6 +96,7 @@ export async function executeSwap(
     router: opts.router,
   });
   const signer = await loadSigner(walletName);
+  const rawBytes = loadSignerRawBytes(walletName);
   const rpc = getRpc();
 
   // Get swap transaction from the router that produced the quote
@@ -113,22 +105,25 @@ export async function executeSwap(
 
   const swapTxBase64 = await router.getSwapTransaction(quote._raw as any, signer.address);
 
-  // Decode and decompile the transaction
-  const txBytes = new Uint8Array(Buffer.from(swapTxBase64, 'base64'));
-  const rawTx = getTransactionDecoder().decode(txBytes);
-  const compiledMsg = getCompiledTransactionMessageDecoder().decode(rawTx.messageBytes);
-  let msg = await decompileTransactionMessageFetchingLookupTables(compiledMsg, rpc);
-
-  // Append noop for on-chain tracking
-  msg = appendTransactionMessageInstructions([createNoopInstruction()], msg) as typeof msg;
-
-  // Sign and encode
-  verbose('Signing swap transaction...');
-  const signedTx = await signTransactionMessageWithSigners(msg);
-  const encodedTx = getBase64EncodedWireTransaction(signedTx);
+  // Use web3.js to sign and send the transaction to avoid v2 kit signer mapping issues
+  verbose('Deserializing Jupiter transaction...');
+  const tx = VersionedTransaction.deserialize(Buffer.from(swapTxBase64, 'base64'));
+  
+  // Create a web3.js Keypair from the raw bytes
+  const { Keypair } = await import('@solana/web3.js');
+  const keypair = Keypair.fromSecretKey(rawBytes);
+  
+  // Sign the transaction
+  verbose('Signing with web3.js keypair...');
+  tx.sign([keypair]);
+  verbose('Transaction signed successfully.');
+  
+  // Encode back to base64 for our v2 sendEncodedTransaction
+  const signedBase64 = Buffer.from(tx.serialize()).toString('base64');
 
   // Send, confirm, and log
-  const result = await sendEncodedTransaction(encodedTx, {
+  verbose('Sending transaction via v2 RPC...');
+  const result = await sendEncodedTransaction(signedBase64, {
     skipPreflight: opts.skipPreflight,
     txType: 'swap',
     walletName,
