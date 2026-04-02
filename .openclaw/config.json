@@ -1,9 +1,9 @@
 {
-  "name": "solana-cli",
-  "description": "Solana CLI for Humans and LLM Agents — wallets, swaps, staking, lending, LP, prediction markets, portfolio tracking",
+  "name": "agentsolwallet",
+  "description": "AgentSolWallet — Solana tools for wallets, swaps, staking, lending, LP, prediction markets, and portfolio tracking",
   "version": "1.0.0",
   "author": "agentsolwallet",
-  "repository": "https://github.com/vadEGO/solana-cli",
+  "repository": "https://github.com/vadEGO/agentsolwallet",
   "commands": {
     "install": "npm install && npm link",
     "run": "sol"

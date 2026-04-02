@@ -1,4 +1,4 @@
-# sol — Solana for Humans and LLM Agents
+# sol — AgentSolWallet
 
 A command-line tool that lets you work with Solana the way you'd describe it out loud. Pay people, buy and sell tokens, stake, lend, and track your portfolio — instead of constructing transactions and managing program instructions, you say what you want. Keys live locally on disk. No API keys, no private key env vars.
 
@@ -45,15 +45,15 @@ Requires Node.js >= 20.
 
 ### Install as an Agent Skill
 
-Sol CLI is available as a discoverable skill for Claude Code and other LLM agents:
+AgentSolWallet is available as a discoverable skill for Claude Code and other LLM agents:
 
 ```bash
 # Claude Code — add the marketplace, then install the plugin
-/plugin marketplace add agentsolwallet/solana-cli
-/plugin install solana-wallet-agent-skill@agentsolwallet-solana-cli
+/plugin marketplace add vadEGO/agentsolwallet
+/plugin install agentsolwallet
 
 # skills.sh
-npx skills add agentsolwallet/solana-cli
+npx skills add vadEGO/agentsolwallet
 ```
 
 Once installed, the agent can use Sol commands directly when you ask it to send crypto, trade tokens, check balances, stake, lend, or track portfolio performance.

@@ -1,8 +1,8 @@
-# Sol CLI — Solana for Humans and LLM Agents
+# AgentSolWallet
 
 ## What This Is
 
-A Solana CLI that reads like English: `sol token swap 50 usdc bonk`, `sol stake new 10`, `sol wallet balance`. Every command has structured `--json` output so LLM agents can drive it programmatically.
+A Solana tool that reads like English: `sol token swap 50 usdc bonk`, `sol stake new 10`, `sol wallet balance`. Every command has structured `--json` output so LLM agents can drive it programmatically.
 
 ## Design Principles
 
@@ -194,7 +194,7 @@ Snapshots capture portfolio state at a point in time. The `snapshot_entries` tab
 The CLI is published as a discoverable agent skill via three channels:
 
 - **Claude Code plugin** — `.claude-plugin/marketplace.json` + `plugin.json` at repo root. Auto-discovered from GitHub.
-- **skills.sh** — `skills/solana-wallet-agent-skill/SKILL.md` + `references/`. Discovered via npm package.
+- **skills.sh** — `skills/agentsolwallet/SKILL.md` + `references/`. Discovered via npm package.
 - **ClawdHub** — same skill directory, published separately.
 
 ### Versioning
@@ -204,13 +204,13 @@ When bumping the version, update ALL of these in sync:
 2. `sdk/package.json` → `version`
 3. `.claude-plugin/plugin.json` → `version`
 4. `.claude-plugin/marketplace.json` → `plugins[0].version`
-5. `skills/solana-wallet-agent-skill/SKILL.md` → frontmatter `version`
+5. `skills/agentsolwallet/SKILL.md` → frontmatter `version`
 
 `src/index.ts` reads the version from `package.json` dynamically — no manual sync needed there.
 
-**Plugin users** get updates when they run `/plugin marketplace update agentsolwallet-solana-cli` or enable auto-update (disabled by default for third-party marketplaces). If you don't bump the version, the update is skipped — Claude Code treats same-version as unchanged.
+**Plugin users** get updates when they run `/plugin marketplace update agentsolwallet` or enable auto-update (disabled by default for third-party marketplaces). If you don't bump the version, the update is skipped — Claude Code treats same-version as unchanged.
 
-**skills.sh users** get updates when they re-run `npx skills add agentsolwallet/solana-cli` (pulls latest from npm). There's no global update command.
+**skills.sh users** get updates when they re-run `npx skills add vadEGO/agentsolwallet` (pulls latest from npm). There's no global update command.
 
 Always `npm publish` after pushing so both channels are in sync.
 

@@ -1,5 +1,5 @@
 ---
-name: solana-wallet-agent-skill
+name: agentsolwallet
 description: >-
   Pay people in SOL or USDC, buy and sell tokens, check prices, discover
   trending and new tokens, create and manage Solana wallets, stake SOL, earn yield
@@ -23,9 +23,9 @@ metadata:
         - npx
 ---
 
-# Payments, Wallets and Trading on Solana
+# AgentSolWallet
 
-Sol is a command-line tool that lets you work with Solana the way you'd
+AgentSolWallet is a command-line tool that lets you work with Solana the way you'd
 describe it out loud. Instead of constructing transactions and managing
 program instructions, you say what you want: pay someone, buy a token,
 stake your SOL.

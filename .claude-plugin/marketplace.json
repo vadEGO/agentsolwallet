@@ -1,14 +1,14 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "agentsolwallet-solana-cli",
-  "description": "Solana CLI tools for payments, trading, staking, lending, and portfolio tracking",
+  "name": "agentsolwallet",
+  "description": "AgentSolWallet — Solana tools for payments, trading, staking, lending, and portfolio tracking",
   "owner": {
     "name": "vadEGO",
     "email": "support@agentsolwallet.com"
   },
   "plugins": [
     {
-      "name": "solana-wallet-agent-skill",
+      "name": "agentsolwallet",
       "description": "Pay people in SOL or USDC, buy and sell tokens, manage wallets, stake, lend, and track your Solana portfolio. No API keys needed.",
       "version": "1.0.0",
       "author": {

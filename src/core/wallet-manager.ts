@@ -90,7 +90,7 @@ export async function importFromSolanaCli(name?: string): Promise<WalletInfo> {
   if (!existsSync(solanaCfgPath)) {
     throw new Error(`Solana CLI keypair not found at ${solanaCfgPath}`);
   }
-  const walletName = name || 'solana-cli';
+  const walletName = name || 'imported';
   return importFromFile(solanaCfgPath, walletName);
 }
 

@@ -1,7 +1,7 @@
 {
   "name": "@agentsolwallet/cli",
   "version": "1.0.0",
-  "description": "Solana CLI for Humans and LLM Agents",
+  "description": "AgentSolWallet — Solana tools for Humans and LLM Agents",
   "type": "module",
   "workspaces": [
     "sdk"
@@ -73,7 +73,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/vadEGO/solana-cli.git"
+    "url": "https://github.com/vadEGO/agentsolwallet.git"
   },
   "license": "MIT"
 }

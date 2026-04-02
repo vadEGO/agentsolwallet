@@ -22,7 +22,7 @@ const program = new Command();
 
 program
   .name('sol')
-  .description('Solana CLI for Humans and LLM Agents')
+  .description('AgentSolWallet — Solana tools for Humans and LLM Agents')
   .version(pkg.version)
   .option('--json', 'Output structured JSON')
   .option('--rpc <url>', 'Override RPC endpoint')

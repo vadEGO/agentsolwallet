@@ -1,6 +1,6 @@
 # @agentsolwallet/sdk
 
-Solana SDK for building apps with Jupiter, Kamino, MarginFi, Drift, Loopscale, and more. Extracted from the [Sol CLI](https://github.com/SolanaGuide/solana-cli) so websites, bots, and other consumers can reuse the same integrations without dragging in Commander, SQLite, or filesystem dependencies.
+Solana SDK for building apps with Jupiter, Kamino, MarginFi, Drift, Loopscale, and more. Extracted from the [AgentSolWallet](https://github.com/vadEGO/agentsolwallet) so websites, bots, and other consumers can reuse the same integrations without dragging in Commander, SQLite, or filesystem dependencies.
 
 ## Install
 
