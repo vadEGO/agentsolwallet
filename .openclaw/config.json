@@ -1,0 +1,18 @@
+{
+  "name": "solana-cli",
+  "description": "Solana CLI for Humans and LLM Agents — wallets, swaps, staking, lending, LP, prediction markets, portfolio tracking",
+  "version": "1.0.0",
+  "author": "agentsolwallet",
+  "repository": "https://github.com/vadEGO/solana-cli",
+  "commands": {
+    "install": "npm install && npm link",
+    "run": "sol"
+  },
+  "bin": "sol",
+  "tags": ["solana", "crypto", "wallet", "defi", "trading", "staking", "lending"],
+  "setup": "Run `sol config set rpc.url <your-rpc>` and `sol wallet create` to get started",
+  "requirements": {
+    "node": ">=20",
+    "bins": ["node", "npm"]
+  }
+}

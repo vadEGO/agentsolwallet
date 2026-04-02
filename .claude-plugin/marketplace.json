@@ -3,7 +3,7 @@
   "name": "agentsolwallet-solana-cli",
   "description": "Solana CLI tools for payments, trading, staking, lending, and portfolio tracking",
   "owner": {
-    "name": "agentsolwallet",
+    "name": "vadEGO",
     "email": "support@agentsolwallet.com"
   },
   "plugins": [
