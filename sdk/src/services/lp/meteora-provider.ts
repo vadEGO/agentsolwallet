@@ -673,13 +673,14 @@ export class MeteoraLpProvider implements LpProvider {
     const mintY = lbPair.tokenYMint.toBase58();
     const symbolA = await this.resolveSymbol(mintX);
     const symbolB = await this.resolveSymbol(mintY);
-    const metaA = await this.deps.registry.resolveToken(mintX);
-    const metaB = await this.deps.registry.resolveToken(mintY);
-    if (metaA?.decimals == null || metaB?.decimals == null) {
-      throw new Error(`Cannot resolve decimals for ${metaA?.decimals == null ? mintX : mintY}`);
-    }
-    const decimalsA = metaA.decimals;
-    const decimalsB = metaB.decimals;
+    
+    let metaA = await this.deps.registry.resolveToken(mintX);
+    let metaB = await this.deps.registry.resolveToken(mintY);
+    
+    // Fallback: if registry doesn't have it, use common defaults
+    const defaultDecimals = (mint: string) => mint === 'So11111111111111111111111111111111111111112' ? 9 : 6;
+    const decimalsA = metaA?.decimals ?? defaultDecimals(mintX);
+    const decimalsB = metaB?.decimals ?? defaultDecimals(mintY);
 
     // Determine amounts
     let amountA = params.amountA ?? 0;
@@ -812,13 +813,14 @@ export class MeteoraLpProvider implements LpProvider {
     const lbPair = dlmm.lbPair;
     const mintX = lbPair.tokenXMint.toBase58();
     const mintY = lbPair.tokenYMint.toBase58();
-    const metaA = await this.deps.registry.resolveToken(mintX);
-    const metaB = await this.deps.registry.resolveToken(mintY);
-    if (metaA?.decimals == null || metaB?.decimals == null) {
-      throw new Error(`Cannot resolve decimals for ${metaA?.decimals == null ? mintX : mintY}`);
-    }
-    const decimalsA = metaA.decimals;
-    const decimalsB = metaB.decimals;
+    
+    let metaA = await this.deps.registry.resolveToken(mintX);
+    let metaB = await this.deps.registry.resolveToken(mintY);
+    
+    // Fallback: if registry doesn't have it, use common defaults
+    const defaultDecimals = (mint: string) => mint === 'So11111111111111111111111111111111111111112' ? 9 : 6;
+    const decimalsA = metaA?.decimals ?? defaultDecimals(mintX);
+    const decimalsB = metaB?.decimals ?? defaultDecimals(mintY);
 
     // Resolve amounts
     let amountA = params.amountA ?? 0;
@@ -941,11 +943,10 @@ export class MeteoraLpProvider implements LpProvider {
     const mintB = poolState.tokenBMint.toBase58();
     const metaA = await this.deps.registry.resolveToken(mintA);
     const metaB = await this.deps.registry.resolveToken(mintB);
-    if (metaA?.decimals == null || metaB?.decimals == null) {
-      throw new Error(`Cannot resolve decimals for ${metaA?.decimals == null ? mintA : mintB}`);
-    }
-    const decimalsA = metaA.decimals;
-    const decimalsB = metaB.decimals;
+    
+    const defaultDecimals = (mint: string) => mint === 'So11111111111111111111111111111111111111112' ? 9 : 6;
+    const decimalsA = metaA?.decimals ?? defaultDecimals(mintA);
+    const decimalsB = metaB?.decimals ?? defaultDecimals(mintB);
 
     let amountA = params.amountA ?? 0;
     let amountB = params.amountB ?? 0;
